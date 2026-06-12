@@ -1,7 +1,9 @@
 import Emprestimo from "../model/Emprestimo.js";
 import { type Request, type Response } from "express";
 
-export default class EmprestimoController extends Emprestimo {
+export default class EmprestimoController {
+  // Removido o 'extends', não precisa dele aqui!
+
   static async todos(req: Request, res: Response) {
     try {
       const lista = await Emprestimo.listarEmprestimos();
@@ -40,17 +42,19 @@ export default class EmprestimoController extends Emprestimo {
     try {
       const dados = req.body;
 
-      // Validations (basic)
-      if (!dados.id_cliente || !dados.valor_emprestimo || !dados.num_parcelas || !dados.valor_parcela || dados.juros == null) {
+      // Adicionado tipo_juros na validação obrigatória
+      if (!dados.id_cliente || !dados.valor_emprestimo || !dados.num_parcelas || !dados.valor_parcela || !dados.tipo_juros || dados.juros == null) {
         res.status(400).json({ mensagem: "Campos obrigatórios ausentes." });
         return;
       }
 
+      // Criando a instância passando também o tipo_juros
       const novo = new Emprestimo(
         dados.id_cliente,
         Number(dados.valor_emprestimo),
         Number(dados.num_parcelas),
         Number(dados.valor_parcela),
+        String(dados.tipo_juros),
         Number(dados.juros),
         dados.data_emprestimo ? new Date(dados.data_emprestimo) : new Date(),
         dados.data_devolucao ? new Date(dados.data_devolucao) : undefined,
@@ -98,8 +102,7 @@ export default class EmprestimoController extends Emprestimo {
       }
 
       const dados = req.body;
-      // Basic validation
-      if (!dados.id_cliente || !dados.valor_emprestimo || !dados.num_parcelas || !dados.valor_parcela || dados.juros == null) {
+      if (!dados.id_cliente || !dados.valor_emprestimo || !dados.num_parcelas || !dados.valor_parcela || !dados.tipo_juros || dados.juros == null) {
         res.status(400).json({ mensagem: "Campos obrigatórios ausentes." });
         return;
       }
@@ -109,6 +112,7 @@ export default class EmprestimoController extends Emprestimo {
         Number(dados.valor_emprestimo),
         Number(dados.num_parcelas),
         Number(dados.valor_parcela),
+        String(dados.tipo_juros),
         Number(dados.juros),
         dados.data_emprestimo ? new Date(dados.data_emprestimo) : new Date(),
         dados.data_devolucao ? new Date(dados.data_devolucao) : undefined,

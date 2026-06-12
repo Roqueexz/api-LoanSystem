@@ -2,7 +2,8 @@ import Cliente from "../model/Cliente.js";
 import { type Request, type Response } from "express";
 import type ClienteDTO from "../interface/ClienteDTO.js";
 
-export default class ClienteController extends Cliente {
+export default class ClienteController {
+    // Removido o 'extends Cliente'
 
     static async todos(req: Request, res: Response) {
         try {
@@ -19,10 +20,8 @@ export default class ClienteController extends Cliente {
             }
 
             res.status(200).json(listaDeClientes);
-
         } catch (error) {
             console.error(`[ClienteController] Erro ao listar clientes:`, error);
-
             res.status(500).json({
                 mensagem: "Erro interno ao recuperar a lista de clientes."
             });
@@ -41,19 +40,12 @@ export default class ClienteController extends Cliente {
             }
 
             const cliente = await Cliente.listarClientes(idCliente);
-
             res.status(200).json(cliente);
-
         } catch (error: any) {
-            console.error(
-                `[ClienteController] Erro ao buscar cliente (id: ${req.params.id}):`,
-                error
-            );
+            console.error(`[ClienteController] Erro ao buscar cliente (id: ${req.params.id}):`, error);
 
             if (error.message?.includes("não encontrado")) {
-                res.status(404).json({
-                    mensagem: error.message
-                });
+                res.status(404).json({ mensagem: error.message });
                 return;
             }
 
@@ -75,8 +67,7 @@ export default class ClienteController extends Cliente {
                 !dadosRecebidos.estado
             ) {
                 res.status(400).json({
-                    mensagem:
-                        "Campos obrigatórios ausentes: nome, sobrenome, telefone, cidade e estado."
+                    mensagem: "Campos obrigatórios ausentes: nome, sobrenome, telefone, cidade e estado."
                 });
                 return;
             }
@@ -87,29 +78,18 @@ export default class ClienteController extends Cliente {
                 dadosRecebidos.telefone,
                 dadosRecebidos.cidade,
                 dadosRecebidos.estado,
-                dadosRecebidos.criado_em
-                    ? new Date(dadosRecebidos.criado_em)
-                    : new Date()
+                dadosRecebidos.criado_em ? new Date(dadosRecebidos.criado_em) : new Date()
             );
 
             const result = await Cliente.cadastrarCliente(novoCliente);
 
             if (result) {
-                res.status(201).json({
-                    mensagem: "Cliente cadastrado com sucesso."
-                });
+                res.status(201).json({ mensagem: "Cliente cadastrado com sucesso." });
             } else {
-                res.status(400).json({
-                    mensagem: "Não foi possível cadastrar o cliente."
-                });
+                res.status(400).json({ mensagem: "Não foi possível cadastrar o cliente." });
             }
-
         } catch (error) {
-            console.error(
-                `[ClienteController] Erro ao cadastrar cliente:`,
-                error
-            );
-
+            console.error(`[ClienteController] Erro ao cadastrar cliente:`, error);
             res.status(500).json({
                 mensagem: "Erro interno ao cadastrar o cliente."
             });
@@ -137,8 +117,7 @@ export default class ClienteController extends Cliente {
                 !dadosRecebidos.estado
             ) {
                 res.status(400).json({
-                    mensagem:
-                        "Campos obrigatórios ausentes: nome, sobrenome, telefone, cidade e estado."
+                    mensagem: "Campos obrigatórios ausentes: nome, sobrenome, telefone, cidade e estado."
                 });
                 return;
             }
@@ -149,9 +128,7 @@ export default class ClienteController extends Cliente {
                 dadosRecebidos.telefone,
                 dadosRecebidos.cidade,
                 dadosRecebidos.estado,
-                dadosRecebidos.criado_em
-                    ? new Date(dadosRecebidos.criado_em)
-                    : new Date()
+                dadosRecebidos.criado_em ? new Date(dadosRecebidos.criado_em) : new Date()
             );
 
             cliente.setIdCliente(idCliente);
@@ -159,25 +136,17 @@ export default class ClienteController extends Cliente {
             const result = await Cliente.atualizarCliente(cliente);
 
             if (result) {
-                res.status(200).json({
-                    mensagem: "Cliente atualizado com sucesso."
-                });
+                res.status(200).json({ mensagem: "Cliente updated com sucesso." });
             } else {
                 res.status(404).json({
                     mensagem: "Cliente não encontrado ou já está inativo."
                 });
             }
-
         } catch (error: any) {
-            console.error(
-                `[ClienteController] Erro ao atualizar cliente (id: ${req.params.id}):`,
-                error
-            );
+            console.error(`[ClienteController] Erro ao atualizar cliente (id: ${req.params.id}):`, error);
 
             if (error.message?.includes("não encontrado")) {
-                res.status(404).json({
-                    mensagem: error.message
-                });
+                res.status(404).json({ mensagem: error.message });
                 return;
             }
 
@@ -201,25 +170,17 @@ export default class ClienteController extends Cliente {
             const result = await Cliente.removerCliente(idCliente);
 
             if (result) {
-                res.status(200).json({
-                    mensagem: "Cliente removido com sucesso."
-                });
+                res.status(200).json({ mensagem: "Cliente removido com sucesso." });
             } else {
                 res.status(404).json({
                     mensagem: "Cliente não encontrado ou já está inativo."
                 });
             }
-
         } catch (error: any) {
-            console.error(
-                `[ClienteController] Erro ao remover cliente (id: ${req.params.id}):`,
-                error
-            );
+            console.error(`[ClienteController] Erro ao remover cliente (id: ${req.params.id}):`, error);
 
             if (error.message?.includes("não encontrado")) {
-                res.status(404).json({
-                    mensagem: error.message
-                });
+                res.status(404).json({ mensagem: error.message });
                 return;
             }
 

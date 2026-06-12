@@ -17,7 +17,7 @@ router.get("/api", (req: Request, res: Response) => {
 // ROTAS DE CLIENTES
 // ============================================
 router.post('/api/clientes', ClienteController.cadastrar);
-// router.put('/api/clientes/:id', ClienteController.atualizar); //
+router.put('/api/clientes/:id', ClienteController.atualizar); 
 router.delete('/api/clientes/:id', ClienteController.remover);
 router.get('/api/clientes', ClienteController.todos);
 router.get('/api/clientes/:id', ClienteController.cliente);

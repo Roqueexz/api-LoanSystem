@@ -8,19 +8,25 @@ export default class Cliente {
   private nome: string;
   private sobrenome: string;
   private telefone: string;
+  private cidade: string;
+  private estado: string;
   private criado_em: Date;
 
-  constructor(
+ constructor(
     _nome: string,
     _sobrenome: string,
     _telefone: string,
+    _cidade: string,
+    _estado: string,
     _criado_em: Date,
-  ) {
+) {
     this.nome = _nome;
     this.sobrenome = _sobrenome;
     this.telefone = _telefone;
+    this.cidade = _cidade;
+    this.estado = _estado;
     this.criado_em = _criado_em;
-  }
+}
   public getIdCliente(): number {
     return this.id_cliente;
   }
@@ -51,6 +57,21 @@ export default class Cliente {
   public setCriadoEm(criado_em: Date): void {
     this.criado_em = criado_em;
   }
+public getCidade(): string {
+    return this.cidade;
+}
+
+public setCidade(cidade: string): void {
+    this.cidade = cidade;
+}
+
+public getEstado(): string {
+    return this.estado;
+}
+
+public setEstado(estado: string): void {
+    this.estado = estado;
+}
 
   private static toDTO(cliente: any): ClienteDTO {
     return {
@@ -58,16 +79,22 @@ export default class Cliente {
       nome_cliente: cliente.nome,
       sobrenome_cliente: cliente.sobrenome,
       telefone: cliente.telefone,
+      cidade: cliente.cidade,
+      estado: cliente.estado,
       criado_em: cliente.criado_em,
       status_cliente: cliente.status_cliente,
     };
   }
 
-  static async listarClientes(id_cliente?: number): Promise<ClienteDTO | ClienteDTO[]> {
+  static async listarClientes(
+    id_cliente?: number,
+  ): Promise<ClienteDTO | ClienteDTO[]> {
     try {
       if (typeof id_cliente === "number") {
         const querySelectCliente = `SELECT * FROM Cliente WHERE id_cliente = $1`;
-        const respostaBD = await database.query(querySelectCliente, [id_cliente]);
+        const respostaBD = await database.query(querySelectCliente, [
+          id_cliente,
+        ]);
 
         if (respostaBD.rows.length === 0) {
           throw new Error(`Cliente com ID ${id_cliente} não encontrado.`);
@@ -91,19 +118,28 @@ export default class Cliente {
       // "RETURNING id_cliente" faz o banco retornar o ID gerado automaticamente após o INSERT
       // Isso confirma que o registro foi criado e nos dá o ID para exibir no log
       const queryInsertCliente = `
-                INSERT INTO Cliente (nome, sobrenome, telefone, criado_em)
-                VALUES ($1, $2, $3, $4)
-                RETURNING id_cliente;
-            `;
+    INSERT INTO Cliente (
+        nome,
+        sobrenome,
+        telefone,
+        cidade,
+        estado,
+        criado_em
+    )
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING id_cliente;
+`;
 
       // Os valores são passados separadamente — o banco substitui $1, $2... na ordem do array
       // .toUpperCase() e .toLowerCase() padronizam os dados antes de salvar no banco
       const valores = [
-        cliente.getNome().toUpperCase(),
-        cliente.getSobrenome().toUpperCase(),
-        cliente.getTelefone(),
-        cliente.getCriadoEm(),
-      ];
+    cliente.getNome().toUpperCase(),
+    cliente.getSobrenome().toUpperCase(),
+    cliente.getTelefone(),
+    cliente.getCidade().toUpperCase(),
+    cliente.getEstado().toUpperCase(),
+    cliente.getCriadoEm(),
+];
 
       const result = await database.query(queryInsertCliente, valores);
       // Se o RETURNING não retornou nenhuma linha, o INSERT falhou silenciosamente
@@ -130,7 +166,9 @@ export default class Cliente {
     const client = await database.connect();
 
     try {
-      const cliente: ClienteDTO = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
+      const cliente: ClienteDTO = (await Cliente.listarClientes(
+        id_cliente,
+      )) as ClienteDTO;
 
       // Se o cliente já está inativo, não há nada a fazer — retorna false sem erro
       if (!cliente.status_cliente) {
@@ -192,20 +230,24 @@ export default class Cliente {
 
       // Cada $n corresponde ao valor na mesma posição do array "valores" abaixo
       // O $7 no WHERE garante que apenas o cliente com o ID correto seja atualizado
-      const queryAtualizarCliente = `
-                UPDATE Cliente SET
-                    nome            = $1,
-                    sobrenome       = $2,
-                    telefone        = $3
-                WHERE id_cliente = $4
-            `;
+const queryAtualizarCliente = `
+    UPDATE Cliente SET
+        nome = $1,
+        sobrenome = $2,
+        telefone = $3,
+        cidade = $4,
+        estado = $5
+    WHERE id_cliente = $6
+`;
 
-      const valores = [
-        cliente.getNome().toUpperCase(),
-        cliente.getSobrenome().toUpperCase(),
-        cliente.getTelefone(),
-        cliente.id_cliente, // Usado no WHERE — identifica qual cliente será atualizado
-      ];
+    const valores = [
+    cliente.getNome().toUpperCase(),
+    cliente.getSobrenome().toUpperCase(),
+    cliente.getTelefone(),
+    cliente.getCidade().toUpperCase(),
+    cliente.getEstado().toUpperCase(),
+    cliente.id_cliente,
+];
 
       const respostaBD = await database.query(queryAtualizarCliente, valores);
 

@@ -1,7 +1,7 @@
 import { server } from "./server.js";
 import { DatabaseModel } from "./model/DatabaseModel.js";
 
-const port = 1285;
+const port = 3333;
 
 new DatabaseModel()
   .testeConexao()

@@ -38,6 +38,15 @@ CREATE TABLE IF NOT EXISTS Emprestimo (
         REFERENCES Cliente(id_cliente)
 );
 
+-- Usuários
+CREATE TABLE IF NOT EXISTS usuario (
+    id_usuario SERIAL,
+    nome VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    senha VARCHAR(100) NOT NULL,
+    role VARCHAR(50) NOT NULL
+);
+
 -- ============================================
 -- INSERTS DE TESTE: CLIENTES
 -- ============================================
@@ -66,3 +75,10 @@ INSERT INTO Emprestimo (id_cliente, valor_emprestimo, num_parcelas, valor_parcel
 
 -- Empréstimo finalizado do Ricardo (ID 4)
 (4, 1500.00, 4, 400.00, 2.50, 'simples', '2025-02-10', '2025-06-10', FALSE);
+
+-- ============================================
+-- INSERTS DE TESTE: Usuários
+-- ============================================
+
+INSERT INTO usuario (nome, email, senha, role) VALUES
+('Rico', 'aldohenriqueroque@gmail.com', 'Aldo1985', 'admin'),

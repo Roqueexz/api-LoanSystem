@@ -4,6 +4,7 @@
 DROP TABLE IF EXISTS Parcela CASCADE;
 DROP TABLE IF EXISTS Emprestimo CASCADE;
 DROP TABLE IF EXISTS Cliente CASCADE;
+DROP TABLE IF EXISTS usuario CASCADE;
 
 -- ============================================
 -- TABELA CLIENTE
@@ -40,15 +41,6 @@ CREATE TABLE IF NOT EXISTS Emprestimo (
         REFERENCES Cliente(id_cliente)
 );
 
--- Usuários
-CREATE TABLE IF NOT EXISTS usuario (
-    id_usuario SERIAL PRIMARY KEY, 
-    nome VARCHAR(100) NOT NULL,
-    email VARCHAR(100) NOT NULL,
-    senha VARCHAR(100) NOT NULL,
-    role VARCHAR(50) NOT NULL
-);
-
 -- ============================================
 -- TABELA PARCELA (O motor do nosso Caixa)
 -- ============================================
@@ -79,6 +71,7 @@ CREATE TABLE IF NOT EXISTS usuario (
     role VARCHAR(20) NOT NULL DEFAULT 'admin',
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
 -- ============================================
 -- INSERTS DE TESTE: CLIENTES
 -- ============================================
@@ -124,8 +117,10 @@ INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, 
 (3, 2, 350.00, 350.00, '2025-08-01', '2025-08-02', 'pago'),
 (3, 3, 350.00, 350.00, '2025-09-01', '2025-09-01', 'pago');
 
+-- ============================================
+-- INSERTS DE TESTE: USUÁRIOS
+-- ============================================
 -- Usuário de teste inicial (Senha padrão para teste: admin123)
--- Nota: Em produção usaríamos bcrypt, mas para bater com seu middleware faremos a busca direta
 INSERT INTO usuario (nome, email, senha, role) VALUES
 ('Administrador', 'admin@sistema.com', 'admin123', 'admin')
 ON CONFLICT (email) DO NOTHING;

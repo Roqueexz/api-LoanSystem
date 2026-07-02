@@ -69,6 +69,17 @@ CREATE TABLE IF NOT EXISTS Parcela (
 );
 
 -- ============================================
+-- TABELA USUARIO (Autenticação do Sistema)
+-- ============================================
+CREATE TABLE IF NOT EXISTS usuario (
+    id_usuario SERIAL PRIMARY KEY,
+    nome VARCHAR(80) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    senha VARCHAR(100) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'admin',
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- ============================================
 -- INSERTS DE TESTE: CLIENTES
 -- ============================================
 INSERT INTO Cliente (nome, sobrenome, telefone, cidade, estado, status_cliente) VALUES
@@ -112,3 +123,9 @@ INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, 
 (3, 1, 350.00, 350.00, '2025-07-01', '2025-07-01', 'pago'),
 (3, 2, 350.00, 350.00, '2025-08-01', '2025-08-02', 'pago'),
 (3, 3, 350.00, 350.00, '2025-09-01', '2025-09-01', 'pago');
+
+-- Usuário de teste inicial (Senha padrão para teste: admin123)
+-- Nota: Em produção usaríamos bcrypt, mas para bater com seu middleware faremos a busca direta
+INSERT INTO usuario (nome, email, senha, role) VALUES
+('Administrador', 'admin@sistema.com', 'admin123', 'admin')
+ON CONFLICT (email) DO NOTHING;

@@ -28,10 +28,11 @@ CREATE TABLE IF NOT EXISTS Emprestimo (
     num_parcelas INT NOT NULL,
     valor_parcela NUMERIC(10,2) NOT NULL,
     juros NUMERIC(5,2) NOT NULL,
-    tipo_juros VARCHAR(30) NOT NULL, -- Coluna adicionada para corrigir o erro 42703
+    tipo_juros VARCHAR(30) NOT NULL,
     data_emprestimo DATE NOT NULL,
     data_devolucao DATE,
     status_emprestimo BOOLEAN NOT NULL DEFAULT TRUE,
+    forma_pagamento VARCHAR(30) DEFAULT NULL,
 
     CONSTRAINT fk_cliente
         FOREIGN KEY (id_cliente)

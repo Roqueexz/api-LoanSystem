@@ -11,4 +11,5 @@ export default interface EmprestimoDTO {
     data_emprestimo: Date;
     data_devolucao?: Date;
     status_emprestimo?: boolean;
+    forma_pagamento?: string;    // Dinheiro, Pix, Boleto, Cartão
 }

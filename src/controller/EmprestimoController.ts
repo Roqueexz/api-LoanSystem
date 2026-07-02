@@ -59,6 +59,7 @@ export default class EmprestimoController {
         dados.data_emprestimo ? new Date(dados.data_emprestimo) : new Date(),
         dados.data_devolucao ? new Date(dados.data_devolucao) : undefined,
         dados.status_emprestimo ?? true,
+        dados.forma_pagamento ?? null,
       );
 
       const result = await Emprestimo.cadastrarEmprestimo(novo);
@@ -117,6 +118,7 @@ export default class EmprestimoController {
         dados.data_emprestimo ? new Date(dados.data_emprestimo) : new Date(),
         dados.data_devolucao ? new Date(dados.data_devolucao) : undefined,
         dados.status_emprestimo ?? true,
+        dados.forma_pagamento ?? null,
       );
       emp.setIdEmprestimo(id);
 

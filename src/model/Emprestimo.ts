@@ -9,11 +9,12 @@ export default class Emprestimo {
   private valor_emprestimo: number;
   private num_parcelas: number;
   private valor_parcela: number;
-  private tipo_juros: string; // Adicionado conforme o banco
+  private tipo_juros: string;
   private juros: number;
   private data_emprestimo: Date;
   private data_devolucao: Date | undefined;
   private status_emprestimo: boolean | undefined;
+  private forma_pagamento: string | undefined;
 
   constructor(
     _id_cliente: number,
@@ -25,6 +26,7 @@ export default class Emprestimo {
     _data_emprestimo: Date,
     _data_devolucao?: Date,
     _status_emprestimo?: boolean,
+    _forma_pagamento?: string,
   ) {
     this.id_cliente = _id_cliente;
     this.valor_emprestimo = _valor_emprestimo;
@@ -35,6 +37,7 @@ export default class Emprestimo {
     this.data_emprestimo = _data_emprestimo;
     this.data_devolucao = _data_devolucao;
     this.status_emprestimo = _status_emprestimo;
+    this.forma_pagamento = _forma_pagamento;
   }
 
   // Getters e Setters
@@ -58,6 +61,8 @@ export default class Emprestimo {
   public setDataDevolucao(d: Date): void { this.data_devolucao = d; }
   public getStatusEmprestimo(): boolean | undefined { return this.status_emprestimo; }
   public setStatusEmprestimo(s: boolean): void { this.status_emprestimo = s; }
+  public getFormaPagamento(): string | undefined { return this.forma_pagamento; }
+  public setFormaPagamento(f: string): void { this.forma_pagamento = f; }
 
   // Ajustado para bater certinho com a interface EmprestimoDTO
   private static toDTO(row: any): EmprestimoDTO {
@@ -74,6 +79,7 @@ export default class Emprestimo {
       data_emprestimo: row.data_emprestimo,
       data_devolucao: row.data_devolucao,
       status_emprestimo: row.status_emprestimo,
+      forma_pagamento: row.forma_pagamento ?? null,
     };
   }
 
@@ -117,11 +123,11 @@ export default class Emprestimo {
 
   static async cadastrarEmprestimo(emprestimo: Emprestimo): Promise<boolean> {
     try {
-      // Corrigido as colunas para bater com o init.sql
       const query = `
         INSERT INTO Emprestimo (
-          id_cliente, valor_emprestimo, num_parcelas, valor_parcela, tipo_juros, juros, data_emprestimo, data_devolucao, status_emprestimo
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          id_cliente, valor_emprestimo, num_parcelas, valor_parcela, tipo_juros, juros,
+          data_emprestimo, data_devolucao, status_emprestimo, forma_pagamento
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
         RETURNING id_emprestimo;
       `;
 
@@ -135,6 +141,7 @@ export default class Emprestimo {
         emprestimo.getDataEmprestimo(),
         emprestimo.getDataDevolucao(),
         emprestimo.getStatusEmprestimo() ?? true,
+        emprestimo.getFormaPagamento() ?? null,
       ];
 
       const result = await database.query(query, valores);
@@ -167,7 +174,6 @@ export default class Emprestimo {
       const consulta = await Emprestimo.listarEmprestimo(emprestimo.getIdEmprestimo());
       if (!consulta) return false;
 
-      // Corrigido nome das colunas
       const query = `
         UPDATE Emprestimo SET
           id_cliente = $1,
@@ -178,8 +184,9 @@ export default class Emprestimo {
           juros = $6,
           data_emprestimo = $7,
           data_devolucao = $8,
-          status_emprestimo = $9
-        WHERE id_emprestimo = $10
+          status_emprestimo = $9,
+          forma_pagamento = $10
+        WHERE id_emprestimo = $11
       `;
 
       const valores = [
@@ -192,6 +199,7 @@ export default class Emprestimo {
         emprestimo.getDataEmprestimo(),
         emprestimo.getDataDevolucao(),
         emprestimo.getStatusEmprestimo() ?? true,
+        emprestimo.getFormaPagamento() ?? null,
         emprestimo.getIdEmprestimo(),
       ];
 

@@ -1,6 +1,7 @@
 -- ============================================
--- DROP TABLES (Sem aspas para bater com a criação)
+-- DROP TABLES (A ordem importa devido às chaves estrangeiras)
 -- ============================================
+DROP TABLE IF EXISTS Parcela CASCADE;
 DROP TABLE IF EXISTS Emprestimo CASCADE;
 DROP TABLE IF EXISTS Cliente CASCADE;
 
@@ -40,6 +41,25 @@ CREATE TABLE IF NOT EXISTS Emprestimo (
 );
 
 -- ============================================
+-- TABELA PARCELA (O motor do nosso Caixa)
+-- ============================================
+CREATE TABLE IF NOT EXISTS Parcela (
+    id_parcela SERIAL PRIMARY KEY,
+    id_emprestimo INT NOT NULL,
+    numero_parcela INT NOT NULL,
+    valor_esperado NUMERIC(10,2) NOT NULL,
+    valor_pago NUMERIC(10,2) DEFAULT 0.00,
+    data_vencimento DATE NOT NULL,
+    data_pagamento DATE,
+    status_parcela VARCHAR(20) DEFAULT 'pendente', -- Opções: 'pendente', 'pago', 'atrasado'
+
+    CONSTRAINT fk_emprestimo
+        FOREIGN KEY (id_emprestimo)
+        REFERENCES Emprestimo(id_emprestimo)
+        ON DELETE CASCADE
+);
+
+-- ============================================
 -- INSERTS DE TESTE: CLIENTES
 -- ============================================
 INSERT INTO Cliente (nome, sobrenome, telefone, cidade, estado, status_cliente) VALUES
@@ -53,17 +73,33 @@ INSERT INTO Cliente (nome, sobrenome, telefone, cidade, estado, status_cliente) 
 -- INSERTS DE TESTE: EMPRÉSTIMOS
 -- ============================================
 INSERT INTO Emprestimo (id_cliente, valor_emprestimo, num_parcelas, valor_parcela, juros, tipo_juros, data_emprestimo, data_devolucao, status_emprestimo) VALUES
--- Empréstimo ativo para o Carlos (ID 1)
+-- 1. Empréstimo ativo para o Carlos
 (1, 5000.00, 12, 458.33, 1.50, 'simples', '2026-01-15', NULL, TRUE),
 
--- Empréstimo ativo para a Ana (ID 2)
+-- 2. Empréstimo ativo para a Ana
 (2, 10000.00, 24, 520.83, 2.00, 'compostos', '2026-03-10', NULL, TRUE),
 
--- Empréstimo já finalizado/pago da Mariana (ID 3)
-(3, 2000.00, 6, 350.00, 1.80, 'simples', '2025-06-01', '2025-12-01', FALSE),
+-- 3. Empréstimo já finalizado/pago da Mariana
+(3, 2000.00, 6, 350.00, 1.80, 'simples', '2025-06-01', '2025-12-01', FALSE);
 
--- Empréstimo ativo recente para a Mariana (ID 3)
-(3, 3500.00, 10, 395.00, 1.28, 'compostos', '2026-05-20', NULL, TRUE),
+-- ============================================
+-- INSERTS DE TESTE: PARCELAS
+-- ============================================
+-- Parcelas do Carlos (Empréstimo 1) - Pagou 2, tem 1 atrasada e o resto pendente
+INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, data_vencimento, data_pagamento, status_parcela) VALUES
+(1, 1, 458.33, 458.33, '2026-02-15', '2026-02-14', 'pago'),
+(1, 2, 458.33, 458.33, '2026-03-15', '2026-03-15', 'pago'),
+(1, 3, 458.33, 0.00, '2026-04-15', NULL, 'atrasado'),
+(1, 4, 458.33, 0.00, '2026-05-15', NULL, 'pendente');
 
--- Empréstimo finalizado do Ricardo (ID 4)
-(4, 1500.00, 4, 400.00, 2.50, 'simples', '2025-02-10', '2025-06-10', FALSE);
+-- Parcelas da Ana (Empréstimo 2) - Pagou 1, o resto pendente
+INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, data_vencimento, data_pagamento, status_parcela) VALUES
+(2, 1, 520.83, 520.83, '2026-04-10', '2026-04-10', 'pago'),
+(2, 2, 520.83, 0.00, '2026-05-10', NULL, 'pendente'),
+(2, 3, 520.83, 0.00, '2026-06-10', NULL, 'pendente');
+
+-- Parcelas da Mariana (Empréstimo 3) - Tudo pago
+INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, data_vencimento, data_pagamento, status_parcela) VALUES
+(3, 1, 350.00, 350.00, '2025-07-01', '2025-07-01', 'pago'),
+(3, 2, 350.00, 350.00, '2025-08-01', '2025-08-02', 'pago'),
+(3, 3, 350.00, 350.00, '2025-09-01', '2025-09-01', 'pago');

@@ -40,6 +40,15 @@ CREATE TABLE IF NOT EXISTS Emprestimo (
         REFERENCES Cliente(id_cliente)
 );
 
+-- Usuários
+CREATE TABLE IF NOT EXISTS usuario (
+    id_usuario SERIAL PRIMARY KEY, 
+    nome VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    senha VARCHAR(100) NOT NULL,
+    role VARCHAR(50) NOT NULL
+);
+
 -- ============================================
 -- TABELA PARCELA (O motor do nosso Caixa)
 -- ============================================

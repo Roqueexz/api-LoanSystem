@@ -1,6 +1,9 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 
+// Importação do middleware de Autenticação
+import { Auth } from "./middleware/Auth.js"; // Ajuste o caminho da pasta se necessário
+
 const router = Router();
 
 import ClienteController from "./controller/ClienteController.js";
@@ -8,23 +11,24 @@ import EmprestimoController from './controller/EmprestimoController.js';
 import CaixaController from "./controller/CaixaController.js"; 
 
 // ============================================
-// ROTA INICIAL
+// ROTA INICIAL & AUTENTICAÇÃO
 // ============================================
 router.get("/api", (req: Request, res: Response) => {
   res.status(200).json({ mensagem: "Olá, boas-vindas a API do OpenLine." });
 });
 
 // ============================================
-// ROTAS DE CLIENTES
+// ROTAS DE CLIENTES (TODAS PROTEGIDAS)
 // ============================================
-router.post('/api/clientes', ClienteController.cadastrar);
-router.put('/api/clientes/:id', ClienteController.atualizar); 
-router.delete('/api/clientes/:id', ClienteController.remover);
-router.get('/api/clientes', ClienteController.todos);
-router.get('/api/clientes/:id', ClienteController.cliente);
+router.post('/api/clientes', Auth.verifyToken, ClienteController.cadastrar);
+router.put('/api/clientes/:id', Auth.verifyToken, ClienteController.atualizar); 
+router.delete('/api/clientes/:id', Auth.verifyToken, ClienteController.remover);
+router.get('/api/clientes', Auth.verifyToken, ClienteController.todos);
+router.get('/api/clientes/:id', Auth.verifyToken, ClienteController.cliente);
+
 
 // ============================================
-// ROTAS DE EMPRESTIMOS
+// ROTAS DE EMPRESTIMOS (TODAS PROTEGIDAS)
 // ============================================
 router.post('/api/emprestimos', EmprestimoController.cadastrar);
 router.put('/api/emprestimos/:id', EmprestimoController.atualizar);

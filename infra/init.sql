@@ -49,16 +49,25 @@ CREATE TABLE IF NOT EXISTS Parcela (
     id_emprestimo INT NOT NULL,
     numero_parcela INT NOT NULL,
     valor_esperado NUMERIC(10,2) NOT NULL,
-    valor_pago NUMERIC(10,2) DEFAULT 0.00,
+    valor_pago NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     data_vencimento DATE NOT NULL,
     data_pagamento DATE,
-    status_parcela VARCHAR(20) DEFAULT 'pendente', -- Opções: 'pendente', 'pago', 'atrasado'
+    status_parcela VARCHAR(20) NOT NULL DEFAULT 'pendente'
+        CHECK (status_parcela IN ('pendente', 'pago')),
+        -- 'atrasado' NÃO é gravado aqui: é calculado pela aplicação
+        -- comparando data_vencimento com a data atual em tempo real.
 
     CONSTRAINT fk_emprestimo
         FOREIGN KEY (id_emprestimo)
         REFERENCES Emprestimo(id_emprestimo)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_parcela_numero
+        UNIQUE (id_emprestimo, numero_parcela)
 );
+
+CREATE INDEX IF NOT EXISTS idx_parcela_emprestimo ON Parcela(id_emprestimo);
+CREATE INDEX IF NOT EXISTS idx_parcela_vencimento ON Parcela(data_vencimento);
 
 -- ============================================
 -- TABELA USUARIO (Autenticação do Sistema)
@@ -86,23 +95,18 @@ INSERT INTO Cliente (nome, sobrenome, telefone, cidade, estado, status_cliente) 
 -- INSERTS DE TESTE: EMPRÉSTIMOS
 -- ============================================
 INSERT INTO Emprestimo (id_cliente, valor_emprestimo, num_parcelas, valor_parcela, juros, tipo_juros, data_emprestimo, data_devolucao, status_emprestimo) VALUES
--- 1. Empréstimo ativo para o Carlos
 (1, 5000.00, 12, 458.33, 1.50, 'simples', '2026-01-15', NULL, TRUE),
-
--- 2. Empréstimo ativo para a Ana
 (2, 10000.00, 24, 520.83, 2.00, 'compostos', '2026-03-10', NULL, TRUE),
-
--- 3. Empréstimo já finalizado/pago da Mariana
 (3, 2000.00, 6, 350.00, 1.80, 'simples', '2025-06-01', '2025-12-01', FALSE);
 
 -- ============================================
 -- INSERTS DE TESTE: PARCELAS
 -- ============================================
--- Parcelas do Carlos (Empréstimo 1) - Pagou 2, tem 1 atrasada e o resto pendente
+-- Parcelas do Carlos (Empréstimo 1) - Pagou 2, tem 1 vencida e o resto pendente
 INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, data_vencimento, data_pagamento, status_parcela) VALUES
 (1, 1, 458.33, 458.33, '2026-02-15', '2026-02-14', 'pago'),
 (1, 2, 458.33, 458.33, '2026-03-15', '2026-03-15', 'pago'),
-(1, 3, 458.33, 0.00, '2026-04-15', NULL, 'atrasado'),
+(1, 3, 458.33, 0.00, '2026-04-15', NULL, 'pendente'),
 (1, 4, 458.33, 0.00, '2026-05-15', NULL, 'pendente');
 
 -- Parcelas da Ana (Empréstimo 2) - Pagou 1, o resto pendente
@@ -120,7 +124,6 @@ INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, 
 -- ============================================
 -- INSERTS DE TESTE: USUÁRIOS
 -- ============================================
--- Usuário de teste inicial (Senha padrão para teste: admin123)
 INSERT INTO usuario (nome, email, senha, role) VALUES
 ('Administrador', 'admin@sistema.com', 'admin123', 'admin')
 ON CONFLICT (email) DO NOTHING;

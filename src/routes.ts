@@ -17,7 +17,7 @@ const authController = new AuthController();
 // ROTA INICIAL & AUTENTICAÇÃO
 // ============================================
 router.get("/api", (req: Request, res: Response) => {
-  res.status(200).json({ mensagem: "Olá, boas-vindas a API do OpenLine." });
+  res.status(200).json({ mensagem: "Olá, boas-vindas a API do LoanSystem." });
 });
 
 // 🔓 Rota Pública: Realizar login e obter o token JWT

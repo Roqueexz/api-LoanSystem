@@ -7,6 +7,7 @@ import { Auth } from "./middleware/Auth.js";
 // Importação dos Controllers
 import ClienteController from "./controller/ClienteController.js";
 import EmprestimoController from './controller/EmprestimoController.js';
+import ParcelaController from './controller/ParcelaController.js';
 import CaixaController from "./controller/CaixaController.js"; 
 import { AuthController } from "./controller/AuthController.js";
 
@@ -40,6 +41,14 @@ router.put('/api/emprestimos/:id', Auth.verifyToken, EmprestimoController.atuali
 router.delete('/api/emprestimos/:id', Auth.verifyToken, EmprestimoController.remover);
 router.get('/api/emprestimos', Auth.verifyToken, EmprestimoController.todos);
 router.get('/api/emprestimos/:id', Auth.verifyToken, EmprestimoController.emprestimo);
+
+// ============================================
+// ROTAS DE PARCELAS (TODAS PROTEGIDAS)
+// ============================================
+router.get('/api/emprestimos/:id/parcelas', Auth.verifyToken, ParcelaController.porEmprestimo);
+router.get('/api/parcelas/:id', Auth.verifyToken, ParcelaController.parcela);
+router.patch('/api/parcelas/:id/pagar', Auth.verifyToken, ParcelaController.pagar);
+router.patch('/api/parcelas/:id/desfazer', Auth.verifyToken, ParcelaController.desfazer);
 
 // ============================================
 // ROTAS DO CAIXA (BALANÇO FINANCEIRO - PROTEGIDA)

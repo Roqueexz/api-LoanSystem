@@ -93,49 +93,49 @@ export default class ParcelaController {
     }
   }
 
- static async listarPorStatus(req: Request, res: Response) {
-  try {
-    const { status } = req.query;
-    const id_cliente = req.query.id_cliente ? Number(req.query.id_cliente) : undefined;
+  static async listarPorStatus(req: Request, res: Response) {
+    try {
+      const { status } = req.query;
+      const id_cliente = req.query.id_cliente ? Number(req.query.id_cliente) : undefined;
 
-    let parcelas: any[] = [];
+      let parcelas: any[] = [];
 
-    if (id_cliente) {
-      const lista = await Parcela.listarPorCliente(id_cliente);
-      parcelas = lista.map((p: any) => p);
-    } else {
-      const query = `
-        SELECT p.*
-        FROM Parcela p
-        JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE e.status_emprestimo = TRUE
-        ORDER BY p.data_vencimento ASC
-      `;
-      const resDb = await database.query(query);
-      parcelas = resDb.rows;
+      if (id_cliente) {
+        const lista = await Parcela.listarPorCliente(id_cliente);
+        parcelas = lista.map((p: any) => p);
+      } else {
+        const query = `
+          SELECT p.*
+          FROM Parcela p
+          JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+          WHERE e.status_emprestimo = TRUE
+          ORDER BY p.data_vencimento ASC
+        `;
+        const resDb = await database.query(query);
+        parcelas = resDb.rows;
+      }
+
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      let filtradas = parcelas;
+
+      if (status === 'pagas') {
+        filtradas = parcelas.filter(p => p.status_parcela === 'pago');
+      } else if (status === 'pendentes') {
+        filtradas = parcelas.filter(p => p.status_parcela === 'pendente');
+      } else if (status === 'atrasadas') {
+        filtradas = parcelas.filter(p => {
+          const vencimento = new Date(p.data_vencimento);
+          vencimento.setHours(0, 0, 0, 0);
+          return p.status_parcela === 'pendente' && vencimento < hoje;
+        });
+      }
+
+      res.status(200).json(filtradas);
+    } catch (error) {
+      console.error('[ParcelaController] Erro ao listar parcelas por status:', error);
+      res.status(500).json({ mensagem: "Erro interno ao listar parcelas." });
     }
-
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-
-    let filtradas = parcelas;
-
-    if (status === 'pagas') {
-      filtradas = parcelas.filter(p => p.status_parcela === 'pago');
-    } else if (status === 'pendentes') {
-      filtradas = parcelas.filter(p => p.status_parcela === 'pendente');
-    } else if (status === 'atrasadas') {
-      filtradas = parcelas.filter(p => {
-        const vencimento = new Date(p.data_vencimento);
-        vencimento.setHours(0, 0, 0, 0);
-        return p.status_parcela === 'pendente' && vencimento < hoje;
-      });
-    }
-
-    res.status(200).json(filtradas);
-  } catch (error) {
-    console.error('[ParcelaController] Erro ao listar parcelas por status:', error);
-    res.status(500).json({ mensagem: "Erro interno ao listar parcelas." });
   }
-}
 }

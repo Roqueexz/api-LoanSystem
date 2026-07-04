@@ -4,7 +4,19 @@ import { type Request, type Response } from "express";
 export default class EmprestimoController {
   static async todos(req: Request, res: Response) {
     try {
-      const lista = await Emprestimo.listarEmprestimos();
+      // Lê o parâmetro ?status da query string
+      const statusParam = req.query.status as string;
+      
+      // Valida o status (padrão: 'ativo')
+      let status: 'ativo' | 'quitado' | 'todos' = 'ativo';
+      if (statusParam === 'quitado') {
+        status = 'quitado';
+      } else if (statusParam === 'todos') {
+        status = 'todos';
+      }
+
+      const lista = await Emprestimo.listarEmprestimos(status);
+      
       if (!lista || lista.length === 0) {
         res.status(204).send();
         return;
@@ -95,8 +107,15 @@ export default class EmprestimoController {
       } else {
         res.status(404).json({ mensagem: "Empréstimo não encontrado." });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[EmprestimoController] Erro ao remover emprestimo (id: ${req.params.id}):`, error);
+      
+      // Mensagem amigável para erro de validação
+      if (error.message?.includes("parcelas pagas")) {
+        res.status(400).json({ mensagem: error.message });
+        return;
+      }
+      
       res.status(500).json({ mensagem: "Erro interno ao remover emprestimo." });
     }
   }

@@ -166,65 +166,78 @@ export default class Emprestimo {
     }
   }
 
-  static async cadastrarEmprestimo(emprestimo: Emprestimo): Promise<number> {
-    const client = await database.connect();
+static async cadastrarEmprestimo(emprestimo: Emprestimo): Promise<number> {
+  const client = await database.connect();
 
-    try {
-      await client.query('BEGIN');
+  try {
+    await client.query('BEGIN');
 
-      const query = `
-        INSERT INTO Emprestimo (
-          id_cliente, valor_emprestimo, num_parcelas, valor_parcela, tipo_juros, juros,
-          data_emprestimo, data_devolucao, status_emprestimo, forma_pagamento
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-        RETURNING id_emprestimo;
-      `;
+    let valorParcelaCalculado = emprestimo.getValorParcela();
 
-      const valores = [
-        emprestimo.getIdCliente(),
-        emprestimo.getValorEmprestimo(),
-        emprestimo.getNumParcelas(),
-        emprestimo.getValorParcela(),
-        emprestimo.getTipoJuros(),
-        emprestimo.getJuros(),
-        emprestimo.getDataEmprestimo(),
-        emprestimo.getDataDevolucao(),
-        emprestimo.getStatusEmprestimo() ?? true,
-        emprestimo.getFormaPagamento() ?? null,
-      ];
+    if (valorParcelaCalculado === 0) {
+      const valorTotal = emprestimo.getValorEmprestimo();
+      const numParcelas = emprestimo.getNumParcelas();
+      const juros = emprestimo.getJuros();
+      const tipoJuros = emprestimo.getTipoJuros();
 
-      const result = await client.query(query, valores);
-      if (result.rows.length === 0) {
-        throw new Error('INSERT nao retornou ID.');
+      let montante = valorTotal;
+      if (tipoJuros === 'simples') {
+        montante = valorTotal + (valorTotal * juros) / 100;
+      } else {
+        montante = valorTotal * Math.pow(1 + juros / 100, numParcelas);
       }
+      valorParcelaCalculado = Number((montante / numParcelas).toFixed(2));
 
-      const id_emprestimo = result.rows[0].id_emprestimo as number;
-
-      const input = Emprestimo.toParcelaInput(emprestimo, id_emprestimo);
-      await Parcela.gerarParcelas(input, client);
-
-      const parcelas = await Parcela.listarPorEmprestimo(id_emprestimo);
-      if (parcelas && parcelas.length > 0) {
-        const primeiraParcela = parcelas[0];
-        if (primeiraParcela && primeiraParcela.valor_parcela !== undefined) {
-          await client.query(
-            `UPDATE Emprestimo SET valor_parcela = $1 WHERE id_emprestimo = $2`,
-            [primeiraParcela.valor_parcela, id_emprestimo]
-          );
-        }
+      const ultimaParcela = Number((montante - (valorParcelaCalculado * (numParcelas - 1))).toFixed(2));
+      if (ultimaParcela !== valorParcelaCalculado) {
+        emprestimo.setValorParcela(valorParcelaCalculado);
+      } else {
+        emprestimo.setValorParcela(valorParcelaCalculado);
       }
-
-      await client.query('COMMIT');
-      console.info(`[EmprestimoModel] Emprestimo cadastrado com parcelas. ID: ${id_emprestimo}`);
-      return id_emprestimo;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('[EmprestimoModel] Erro ao cadastrar emprestimo:', error);
-      throw error;
-    } finally {
-      client.release();
     }
+
+    const query = `
+      INSERT INTO Emprestimo (
+        id_cliente, valor_emprestimo, num_parcelas, valor_parcela, tipo_juros, juros,
+        data_emprestimo, data_devolucao, status_emprestimo, forma_pagamento
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      RETURNING id_emprestimo;
+    `;
+
+    const valores = [
+      emprestimo.getIdCliente(),
+      emprestimo.getValorEmprestimo(),
+      emprestimo.getNumParcelas(),
+      emprestimo.getValorParcela(),
+      emprestimo.getTipoJuros(),
+      emprestimo.getJuros(),
+      emprestimo.getDataEmprestimo(),
+      emprestimo.getDataDevolucao(),
+      emprestimo.getStatusEmprestimo() ?? true,
+      emprestimo.getFormaPagamento() ?? null,
+    ];
+
+    const result = await client.query(query, valores);
+    if (result.rows.length === 0) {
+      throw new Error('INSERT nao retornou ID.');
+    }
+
+    const id_emprestimo = result.rows[0].id_emprestimo as number;
+
+    const input = Emprestimo.toParcelaInput(emprestimo, id_emprestimo);
+    await Parcela.gerarParcelas(input, client);
+
+    await client.query('COMMIT');
+    console.info(`[EmprestimoModel] Emprestimo cadastrado com parcelas. ID: ${id_emprestimo}`);
+    return id_emprestimo;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('[EmprestimoModel] Erro ao cadastrar emprestimo:', error);
+    throw error;
+  } finally {
+    client.release();
   }
+}
 
   static async removerEmprestimo(id_emprestimo: number): Promise<boolean> {
     const client = await database.connect();

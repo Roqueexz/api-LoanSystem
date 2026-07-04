@@ -26,12 +26,16 @@ export default class Caixa {
             const resRecebido = await database.query(queryTotalRecebido);
             const totalRecebido = Number(resRecebido.rows[0]?.total || 0);
 
-            // 3. Total pendente
-            const queryPendente = `
-                SELECT COALESCE(SUM(valor_esperado - valor_pago), 0) AS total
-                FROM Parcela
-                WHERE status_parcela = 'pendente'
-            `;
+           // 3. Total a receber (soma do que falta receber de cada emprestimo ativo)
+const queryPendente = `
+    SELECT COALESCE(SUM(
+        e.valor_emprestimo - COALESCE(
+            (SELECT SUM(valor_pago) FROM Parcela p WHERE p.id_emprestimo = e.id_emprestimo AND p.status_parcela = 'pago'), 0
+        )
+    ), 0) AS total
+    FROM Emprestimo e
+    WHERE e.status_emprestimo = TRUE
+`;
             const resPendente = await database.query(queryPendente);
             const entradaPendente = Number(resPendente.rows[0]?.total || 0);
 

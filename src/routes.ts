@@ -11,6 +11,12 @@ import ParcelaController from './controller/ParcelaController.js';
 import CaixaController from "./controller/CaixaController.js"; 
 import { AuthController } from "./controller/AuthController.js";
 
+// Importação dos Schemas e Validation
+import { validate } from "./middleware/Validation.js";
+import { ClienteSchema } from "./schemas/ClienteSchema.js";
+import { EmprestimoSchema } from "./schemas/EmprestimoSchema.js";
+import { LoginSchema } from "./schemas/AuthSchema.js";
+
 const router = Router();
 const authController = new AuthController();
 
@@ -22,13 +28,13 @@ router.get("/api", (req: Request, res: Response) => {
 });
 
 // 🔓 Rota Pública: Realizar login e obter o token JWT
-router.post('/api/login', authController.login);
+router.post('/api/login', validate(LoginSchema), authController.login);
 
 // ============================================
 // ROTAS DE CLIENTES (TODAS PROTEGIDAS)
 // ============================================
-router.post('/api/clientes', Auth.verifyToken, ClienteController.cadastrar);
-router.put('/api/clientes/:id', Auth.verifyToken, ClienteController.atualizar); 
+router.post('/api/clientes', Auth.verifyToken, validate(ClienteSchema), ClienteController.cadastrar);
+router.put('/api/clientes/:id', Auth.verifyToken, validate(ClienteSchema), ClienteController.atualizar); 
 router.delete('/api/clientes/:id', Auth.verifyToken, ClienteController.remover);
 router.get('/api/clientes', Auth.verifyToken, ClienteController.todos);
 
@@ -38,8 +44,8 @@ router.get('/api/clientes/:id', Auth.verifyToken, ClienteController.cliente);
 // ============================================
 // ROTAS DE EMPRESTIMOS (TODAS PROTEGIDAS)
 // ============================================
-router.post('/api/emprestimos', Auth.verifyToken, EmprestimoController.cadastrar);
-router.put('/api/emprestimos/:id', Auth.verifyToken, EmprestimoController.atualizar);
+router.post('/api/emprestimos', Auth.verifyToken, validate(EmprestimoSchema), EmprestimoController.cadastrar);
+router.put('/api/emprestimos/:id', Auth.verifyToken, validate(EmprestimoSchema), EmprestimoController.atualizar);
 router.delete('/api/emprestimos/:id', Auth.verifyToken, EmprestimoController.remover);
 router.get('/api/emprestimos', Auth.verifyToken, EmprestimoController.todos);
 router.get('/api/emprestimos/:id', Auth.verifyToken, EmprestimoController.emprestimo);

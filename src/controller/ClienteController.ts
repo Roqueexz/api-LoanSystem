@@ -189,4 +189,30 @@ export default class ClienteController {
             });
         }
     }
+    static async resumo(req: Request, res: Response) {
+  try {
+    const idCliente = parseInt(req.params.id as string);
+
+    if (isNaN(idCliente) || idCliente <= 0) {
+      res.status(400).json({
+        mensagem: "ID invalido. Informe um numero inteiro positivo."
+      });
+      return;
+    }
+
+    const resumo = await Cliente.obterResumo(idCliente);
+    res.status(200).json(resumo);
+  } catch (error: any) {
+    console.error(`[ClienteController] Erro ao buscar resumo do cliente (id: ${req.params.id}):`, error);
+
+    if (error.message?.includes("não encontrado")) {
+      res.status(404).json({ mensagem: error.message });
+      return;
+    }
+
+    res.status(500).json({
+      mensagem: "Erro interno ao recuperar o resumo do cliente."
+    });
+  }
+}
 }

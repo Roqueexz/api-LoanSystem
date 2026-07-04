@@ -87,46 +87,45 @@ export default class Cliente {
   }
 
   static async obterResumo(id_cliente: number): Promise<ResumoClienteDTO> {
-    const cliente = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
-    const emprestimos = await Emprestimo.listarEmprestimos('todos', id_cliente);
+  const cliente = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
+  const emprestimos = await Emprestimo.listarEmprestimos('todos', id_cliente);
 
-    const emprestimosComParcelas = await Promise.all(
-      emprestimos.map(async (emp) => ({
-        ...emp,
-        parcelas: await Parcela.listarPorEmprestimo(emp.id_emprestimo!),
-      })),
-    );
+  const emprestimosComParcelas = await Promise.all(
+    emprestimos.map(async (emp) => ({
+      ...emp,
+      parcelas: await Parcela.listarPorEmprestimo(emp.id_emprestimo!),
+    })),
+  );
 
-    const todasParcelas = emprestimosComParcelas.flatMap((emp) => emp.parcelas);
+  const todasParcelas = emprestimosComParcelas.flatMap((emp) => emp.parcelas);
 
-    const total_emprestado = emprestimos
-      .filter((emp) => emp.status_emprestimo)
-      .reduce((acc, emp) => acc + Number(emp.valor_emprestimo), 0);
+  const total_emprestado = emprestimos
+    .filter((emp) => emp.status_emprestimo)
+    .reduce((acc, emp) => acc + Number(emp.valor_emprestimo), 0);
 
-    const total_recebido = todasParcelas
-      .filter((p) => p.status_parcela === 'PAGA')
-      .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
+  const total_recebido = todasParcelas
+    .filter((p) => p.status_parcela === 'PAGA')
+    .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
 
-    const total_em_aberto = todasParcelas
-      .filter((p) => p.status_parcela !== 'PAGA')
-      .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
+  const total_em_aberto = todasParcelas
+    .filter((p) => p.status_parcela !== 'PAGA')
+    .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
 
-    const total_atrasado = todasParcelas
-      .filter((p) => p.status_parcela === 'ATRASADA')
-      .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
+  const total_atrasado = todasParcelas
+    .filter((p) => p.status_parcela === 'ATRASADA')
+    .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
 
-    return {
-      cliente,
-      emprestimos: emprestimosComParcelas,
-      totais: {
-        total_emprestado,
-        total_recebido,
-        total_em_aberto,
-        total_atrasado,
-      },
-    };
-  }
-
+  return {
+    cliente,
+    emprestimos: emprestimosComParcelas,
+    totais: {
+      total_emprestado,
+      total_recebido,
+      total_em_aberto,
+      total_atrasado,
+    },
+  };
+}
   static async cadastrarCliente(cliente: Cliente): Promise<boolean> {
     try {
       const queryInsertCliente = `

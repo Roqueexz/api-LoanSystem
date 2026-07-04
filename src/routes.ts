@@ -31,6 +31,8 @@ router.post('/api/clientes', Auth.verifyToken, ClienteController.cadastrar);
 router.put('/api/clientes/:id', Auth.verifyToken, ClienteController.atualizar); 
 router.delete('/api/clientes/:id', Auth.verifyToken, ClienteController.remover);
 router.get('/api/clientes', Auth.verifyToken, ClienteController.todos);
+
+router.get('/api/clientes/:id/resumo', Auth.verifyToken, ClienteController.resumo);
 router.get('/api/clientes/:id', Auth.verifyToken, ClienteController.cliente);
 
 // ============================================

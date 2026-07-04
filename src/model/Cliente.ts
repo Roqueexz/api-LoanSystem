@@ -157,40 +157,60 @@ export default class Cliente {
     }
   }
 
-  static async removerCliente(id_cliente: number): Promise<boolean> {
-    const client = await database.connect();
+ static async removerCliente(id_cliente: number): Promise<boolean> {
+  const client = await database.connect();
 
-    try {
-      const cliente: ClienteDTO = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
+  try {
+    const cliente: ClienteDTO = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
 
-      if (!cliente.status_cliente) {
-        return false;
-      }
-
-      await client.query("BEGIN");
-
-      await Parcela.excluirPendentesPorCliente(id_cliente, client);
-
-      await client.query(
-        `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_cliente = $1`,
-        [id_cliente]
-      );
-
-      const result = await client.query(
-        `UPDATE Cliente SET status_cliente = FALSE WHERE id_cliente = $1`,
-        [id_cliente]
-      );
-
-      await client.query("COMMIT");
-      return (result.rowCount ?? 0) > 0;
-    } catch (error) {
-      await client.query("ROLLBACK");
-      console.error(`[ClienteModel] Erro ao remover cliente (id: ${id_cliente}):`, error);
-      throw error;
-    } finally {
-      client.release();
+    if (!cliente.status_cliente) {
+      return false;
     }
+
+    // VERIFICAR SE HÁ PARCELAS PAGAS
+    const queryPagas = `
+      SELECT COUNT(*)::int AS total
+      FROM Parcela p
+      JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+      WHERE e.id_cliente = $1 AND p.status_parcela = 'pago'
+    `;
+    const resultPagas = await client.query(queryPagas, [id_cliente]);
+    const pagas = resultPagas.rows[0]?.total ?? 0;
+
+    if (pagas > 0) {
+      throw new Error(
+        `Não é possível inativar cliente com ${pagas} parcela(s) paga(s). ` +
+        `Para remover, primeiro desfaça os pagamentos.`
+      );
+    }
+
+    await client.query("BEGIN");
+
+    // Excluir parcelas pendentes do cliente
+    await Parcela.excluirPendentesPorCliente(id_cliente, client);
+
+    // Inativar todos os empréstimos do cliente
+    await client.query(
+      `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_cliente = $1`,
+      [id_cliente]
+    );
+
+    // Inativar cliente
+    const result = await client.query(
+      `UPDATE Cliente SET status_cliente = FALSE WHERE id_cliente = $1`,
+      [id_cliente]
+    );
+
+    await client.query("COMMIT");
+    return (result.rowCount ?? 0) > 0;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(`[ClienteModel] Erro ao remover cliente (id: ${id_cliente}):`, error);
+    throw error;
+  } finally {
+    client.release();
   }
+}
 
   static async atualizarCliente(cliente: Cliente): Promise<boolean> {
     try {

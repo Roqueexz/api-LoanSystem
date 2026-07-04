@@ -1,7 +1,7 @@
 import type CaixaDTO from "../interface/CaixaDTO.js";
-import { DatabaseModel } from "./DatabaseModel.js";
+import databaseInstance from "./DatabaseModel.js"; // ← CORRIGIDO
 
-const database = new DatabaseModel().pool;
+const database = databaseInstance.pool; // ← CORRIGIDO
 
 export default class Caixa {
 

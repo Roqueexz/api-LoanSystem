@@ -95,7 +95,6 @@ export default class Emprestimo {
       status_emprestimo: emprestimo.getStatusEmprestimo() ?? true,
     };
 
-    // Só adiciona se existir
     const dataDevolucao = emprestimo.getDataDevolucao();
     if (dataDevolucao) {
       input.data_devolucao = dataDevolucao;
@@ -157,7 +156,7 @@ export default class Emprestimo {
       const res = await database.query(query, [id_emprestimo]);
 
       if (res.rows.length === 0) {
-        throw new Error(`Empréstimo com ID ${id_emprestimo} não encontrado.`);
+        throw new Error(`Emprestimo com ID ${id_emprestimo} nao encontrado.`);
       }
 
       return Emprestimo.toDTO(res.rows[0]);
@@ -196,14 +195,27 @@ export default class Emprestimo {
 
       const result = await client.query(query, valores);
       if (result.rows.length === 0) {
-        throw new Error('INSERT não retornou ID.');
+        throw new Error('INSERT nao retornou ID.');
       }
 
       const id_emprestimo = result.rows[0].id_emprestimo as number;
-      await Parcela.gerarParcelas(Emprestimo.toParcelaInput(emprestimo, id_emprestimo), client);
+
+      const input = Emprestimo.toParcelaInput(emprestimo, id_emprestimo);
+      await Parcela.gerarParcelas(input, client);
+
+      const parcelas = await Parcela.listarPorEmprestimo(id_emprestimo);
+      if (parcelas && parcelas.length > 0) {
+        const primeiraParcela = parcelas[0];
+        if (primeiraParcela && primeiraParcela.valor_parcela !== undefined) {
+          await client.query(
+            `UPDATE Emprestimo SET valor_parcela = $1 WHERE id_emprestimo = $2`,
+            [primeiraParcela.valor_parcela, id_emprestimo]
+          );
+        }
+      }
 
       await client.query('COMMIT');
-      console.info(`[EmprestimoModel] Empréstimo cadastrado com parcelas. ID: ${id_emprestimo}`);
+      console.info(`[EmprestimoModel] Emprestimo cadastrado com parcelas. ID: ${id_emprestimo}`);
       return id_emprestimo;
     } catch (error) {
       await client.query('ROLLBACK');
@@ -214,40 +226,37 @@ export default class Emprestimo {
     }
   }
 
-static async removerEmprestimo(id_emprestimo: number): Promise<boolean> {
-  const client = await database.connect();
+  static async removerEmprestimo(id_emprestimo: number): Promise<boolean> {
+    const client = await database.connect();
 
-  try {
-    // VERIFICAR SE HÁ PARCELAS PAGAS
-    const pagas = await Parcela.contarPagas(id_emprestimo, client);
-    if (pagas > 0) {
-      throw new Error(
-        `Não é possível inativar empréstimo com ${pagas} parcela(s) paga(s). ` +
-        `Para remover, primeiro desfaça os pagamentos.`
+    try {
+      const pagas = await Parcela.contarPagas(id_emprestimo, client);
+      if (pagas > 0) {
+        throw new Error(
+          `Nao e possivel inativar emprestimo com ${pagas} parcela(s) paga(s). ` +
+          `Para remover, primeiro desfaca os pagamentos.`
+        );
+      }
+
+      await client.query('BEGIN');
+
+      await Parcela.excluirParcelasPendentes(id_emprestimo, client);
+
+      const res = await client.query(
+        `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_emprestimo = $1`,
+        [id_emprestimo],
       );
+
+      await client.query('COMMIT');
+      return (res.rowCount ?? 0) > 0;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error(`[EmprestimoModel] Erro ao remover emprestimo (id: ${id_emprestimo}):`, error);
+      throw error;
+    } finally {
+      client.release();
     }
-
-    await client.query('BEGIN');
-
-    // Excluir parcelas pendentes
-    await Parcela.excluirParcelasPendentes(id_emprestimo, client);
-
-    // Inativar empréstimo
-    const res = await client.query(
-      `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_emprestimo = $1`,
-      [id_emprestimo],
-    );
-
-    await client.query('COMMIT');
-    return (res.rowCount ?? 0) > 0;
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error(`[EmprestimoModel] Erro ao remover emprestimo (id: ${id_emprestimo}):`, error);
-    throw error;
-  } finally {
-    client.release();
   }
-}
 
   static async atualizarEmprestimo(emprestimo: Emprestimo): Promise<boolean> {
     const client = await database.connect();
@@ -268,7 +277,7 @@ static async removerEmprestimo(id_emprestimo: number): Promise<boolean> {
 
         if (emprestimo.getNumParcelas() < pagas) {
           throw new Error(
-            `Não é possível reduzir para ${emprestimo.getNumParcelas()} parcelas: ${pagas} já foram pagas.`,
+            `Nao e possivel reduzir para ${emprestimo.getNumParcelas()} parcelas: ${pagas} ja foram pagas.`,
           );
         }
 
@@ -278,6 +287,17 @@ static async removerEmprestimo(id_emprestimo: number): Promise<boolean> {
           pagas + 1,
           client,
         );
+
+        const parcelas = await Parcela.listarPorEmprestimo(emprestimo.getIdEmprestimo());
+        if (parcelas && parcelas.length > 0) {
+          const primeiraParcela = parcelas[0];
+          if (primeiraParcela && primeiraParcela.valor_parcela !== undefined) {
+            await client.query(
+              `UPDATE Emprestimo SET valor_parcela = $1 WHERE id_emprestimo = $2`,
+              [primeiraParcela.valor_parcela, emprestimo.getIdEmprestimo()]
+            );
+          }
+        }
       }
 
       const query = `

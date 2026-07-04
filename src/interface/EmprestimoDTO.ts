@@ -1,15 +1,15 @@
 export default interface EmprestimoDTO {
     id_emprestimo?: number;
     id_cliente: number;
-    nome_cliente?: string;       // Adicionado para o SELECT JOIN
-    sobrenome_cliente?: string;  // Adicionado para o SELECT JOIN
+    nome_cliente?: string;
+    sobrenome_cliente?: string;
     valor_emprestimo: number;
     num_parcelas: number;
-    valor_parcela: number;
-    tipo_juros: string;          // Obrigatório no banco
+    valor_parcela?: number;
+    tipo_juros: string;
     juros: number;
     data_emprestimo: Date;
-    data_devolucao?: Date;
+    data_devolucao?: Date | undefined;
     status_emprestimo?: boolean;
-    forma_pagamento?: string;    // Dinheiro, Pix, Boleto, Cartão
+    forma_pagamento?: string | undefined;
 }

@@ -1,16 +1,17 @@
+// Validation.ts
 import { type Request, type Response, type NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 
-export const validate = (schema: AnyZodObject) => {
+export const validate = (schema: z.ZodObject<any, any>) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       await schema.parseAsync(req.body);
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        const errors = error.errors.map((err) => ({
-          campo: err.path.join('.'),
-          mensagem: err.message,
+        const errors = error.issues.map((issue) => ({
+          campo: issue.path.join('.'),
+          mensagem: issue.message,
         }));
         res.status(400).json({
           mensagem: "Dados invalidos",

@@ -229,4 +229,7 @@ export default class Parcela {
       throw error;
     }
   }
+  static toPublicDTO(row: any): ParcelaDTO {
+  return Parcela.toDTO(row);
+}
 }

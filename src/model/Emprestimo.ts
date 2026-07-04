@@ -78,12 +78,12 @@ export default class Emprestimo {
       data_emprestimo: row.data_emprestimo,
       data_devolucao: row.data_devolucao,
       status_emprestimo: row.status_emprestimo,
-      forma_pagamento: row.forma_pagamento ?? null,
+      forma_pagamento: row.forma_pagamento ?? undefined,
     };
   }
 
   private static toParcelaInput(emprestimo: Emprestimo, id_emprestimo: number): EmprestimoDTO & { id_emprestimo: number } {
-    return {
+    const input: EmprestimoDTO & { id_emprestimo: number } = {
       id_emprestimo,
       id_cliente: emprestimo.getIdCliente(),
       valor_emprestimo: emprestimo.getValorEmprestimo(),
@@ -92,10 +92,21 @@ export default class Emprestimo {
       tipo_juros: emprestimo.getTipoJuros(),
       juros: emprestimo.getJuros(),
       data_emprestimo: emprestimo.getDataEmprestimo(),
-      data_devolucao: emprestimo.getDataDevolucao(),
       status_emprestimo: emprestimo.getStatusEmprestimo() ?? true,
-      forma_pagamento: emprestimo.getFormaPagamento() ?? null,
     };
+
+    // Só adiciona se existir
+    const dataDevolucao = emprestimo.getDataDevolucao();
+    if (dataDevolucao) {
+      input.data_devolucao = dataDevolucao;
+    }
+
+    const formaPagamento = emprestimo.getFormaPagamento();
+    if (formaPagamento) {
+      input.forma_pagamento = formaPagamento;
+    }
+
+    return input;
   }
 
   static async listarEmprestimos(

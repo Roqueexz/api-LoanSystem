@@ -2,8 +2,6 @@ import Emprestimo from "../model/Emprestimo.js";
 import { type Request, type Response } from "express";
 
 export default class EmprestimoController {
-  // Removido o 'extends', não precisa dele aqui!
-
   static async todos(req: Request, res: Response) {
     try {
       const lista = await Emprestimo.listarEmprestimos();
@@ -42,18 +40,20 @@ export default class EmprestimoController {
     try {
       const dados = req.body;
 
-      // Adicionado tipo_juros na validação obrigatória
-      if (!dados.id_cliente || !dados.valor_emprestimo || !dados.num_parcelas || !dados.valor_parcela || !dados.tipo_juros || dados.juros == null) {
+      // VALIDAÇÃO: valor_parcela é OPCIONAL agora
+      if (!dados.id_cliente || !dados.valor_emprestimo || !dados.num_parcelas || !dados.tipo_juros || dados.juros == null) {
         res.status(400).json({ mensagem: "Campos obrigatórios ausentes." });
         return;
       }
 
-      // Criando a instância passando também o tipo_juros
+      // Se valor_parcela não veio ou é 0, enviar 0 (será calculado no model)
+      const valorParcela = dados.valor_parcela ? Number(dados.valor_parcela) : 0;
+
       const novo = new Emprestimo(
         dados.id_cliente,
         Number(dados.valor_emprestimo),
         Number(dados.num_parcelas),
-        Number(dados.valor_parcela),
+        valorParcela,
         String(dados.tipo_juros),
         Number(dados.juros),
         dados.data_emprestimo ? new Date(dados.data_emprestimo) : new Date(),
@@ -68,8 +68,15 @@ export default class EmprestimoController {
       } else {
         res.status(400).json({ mensagem: "Não foi possível cadastrar o empréstimo." });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[EmprestimoController] Erro ao cadastrar emprestimo:`, error);
+      
+      // Mensagem amigável para erro de validação de soma
+      if (error.message?.includes("Soma das parcelas")) {
+        res.status(400).json({ mensagem: error.message });
+        return;
+      }
+      
       res.status(500).json({ mensagem: "Erro interno ao cadastrar emprestimo." });
     }
   }
@@ -103,16 +110,20 @@ export default class EmprestimoController {
       }
 
       const dados = req.body;
-      if (!dados.id_cliente || !dados.valor_emprestimo || !dados.num_parcelas || !dados.valor_parcela || !dados.tipo_juros || dados.juros == null) {
+      
+      // VALIDAÇÃO: valor_parcela é OPCIONAL agora
+      if (!dados.id_cliente || !dados.valor_emprestimo || !dados.num_parcelas || !dados.tipo_juros || dados.juros == null) {
         res.status(400).json({ mensagem: "Campos obrigatórios ausentes." });
         return;
       }
+
+      const valorParcela = dados.valor_parcela ? Number(dados.valor_parcela) : 0;
 
       const emp = new Emprestimo(
         dados.id_cliente,
         Number(dados.valor_emprestimo),
         Number(dados.num_parcelas),
-        Number(dados.valor_parcela),
+        valorParcela,
         String(dados.tipo_juros),
         Number(dados.juros),
         dados.data_emprestimo ? new Date(dados.data_emprestimo) : new Date(),
@@ -130,10 +141,22 @@ export default class EmprestimoController {
       }
     } catch (error: any) {
       console.error(`[EmprestimoController] Erro ao atualizar emprestimo (id: ${req.params.id}):`, error);
+      
+      if (error.message?.includes("Soma das parcelas")) {
+        res.status(400).json({ mensagem: error.message });
+        return;
+      }
+      
       if (error.message?.includes("não encontrado")) {
         res.status(404).json({ mensagem: error.message });
         return;
       }
+      
+      if (error.message?.includes("Não é possível reduzir")) {
+        res.status(400).json({ mensagem: error.message });
+        return;
+      }
+      
       res.status(500).json({ mensagem: "Erro interno ao atualizar emprestimo." });
     }
   }

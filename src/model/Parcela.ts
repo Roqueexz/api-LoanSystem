@@ -1,16 +1,14 @@
-// model/Parcela.ts
 import databaseInstance from './DatabaseModel.js';
 import type ParcelaDTO from '../interface/ParcelaDTO.js';
 import type EmprestimoDTO from '../interface/EmprestimoDTO.js';
 import type pg from 'pg';
+import CalculadoraFinanceira from '../services/CalculadoraFinanceira.js';
+import Utilitario from '../services/Utilitario.js';
 
 const database = databaseInstance.pool;
 type Executor = pg.Pool | pg.PoolClient;
 
 export default class Parcela {
-  // --------------------------------------
-  // MAPEIA UMA LINHA DO BANCO PARA O DTO DA API
-  // --------------------------------------
   private static toDTO(row: any): ParcelaDTO {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
@@ -36,33 +34,83 @@ export default class Parcela {
     };
   }
 
-  // --------------------------------------
-  // GERA AS PARCELAS DE UM EMPRÉSTIMO
-  // Deve rodar na MESMA transação do cadastro do empréstimo
-  // (por isso aceita um executor opcional: client de transação ou o pool padrão)
-  // --------------------------------------
   static async gerarParcelas(
     emprestimo: EmprestimoDTO & { id_emprestimo: number },
     executor: Executor = database,
   ): Promise<boolean> {
+    return Parcela.gerarParcelasRestantes(emprestimo, 1, executor);
+  }
+
+  static async gerarParcelasRestantes(
+    emprestimo: EmprestimoDTO & { id_emprestimo: number },
+    aPartirDe: number,
+    executor: Executor = database,
+  ): Promise<boolean> {
     try {
-      const dataBase = new Date(emprestimo.data_emprestimo);
+      const {
+        id_emprestimo,
+        num_parcelas,
+        valor_emprestimo,
+        valor_parcela: valorParcelaInformado,
+        juros,
+        tipo_juros,
+        data_emprestimo
+      } = emprestimo;
 
-      for (let numero = 1; numero <= emprestimo.num_parcelas; numero++) {
-        const vencimento = new Date(dataBase);
-        vencimento.setMonth(vencimento.getMonth() + numero);
+      // DETERMINAR VALOR DA PARCELA
+      let valorParcelaBase: number;
 
-        const query = `
-          INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, data_vencimento, status_parcela)
-          VALUES ($1, $2, $3, $4, 'pendente')
-        `;
+      if (valorParcelaInformado && valorParcelaInformado > 0) {
+        // Usuário informou manualmente - validar
+        const validacao = CalculadoraFinanceira.validarSomaParcelas(
+          valor_emprestimo,
+          valorParcelaInformado,
+          num_parcelas,
+          0.01 // margem de 1 centavo
+        );
 
-        await executor.query(query, [
-          emprestimo.id_emprestimo,
-          numero,
-          emprestimo.valor_parcela,
-          vencimento,
-        ]);
+        if (!validacao.valido) {
+          throw new Error(
+            `Soma das parcelas (${(valorParcelaInformado * num_parcelas).toFixed(2)}) ` +
+            `não confere com o valor total (${valor_emprestimo.toFixed(2)}). ` +
+            `Sugestão: R$ ${validacao.sugestao?.toFixed(2)} por parcela.`
+          );
+        }
+
+        valorParcelaBase = valorParcelaInformado;
+      } else {
+        // Calcular automaticamente
+        valorParcelaBase = CalculadoraFinanceira.calcularValorParcela(
+          valor_emprestimo,
+          num_parcelas,
+          juros,
+          tipo_juros as 'simples' | 'compostos'
+        );
+        // Arredondar para 2 casas
+        valorParcelaBase = Math.round(valorParcelaBase * 100) / 100;
+      }
+
+      // Calcular ajuste da última parcela
+      const ultimaParcela = CalculadoraFinanceira.ajustarUltimaParcela(
+        valor_emprestimo,
+        valorParcelaBase,
+        num_parcelas
+      );
+
+      // GERAR PARCELAS
+      const dataBase = new Date(data_emprestimo);
+
+      for (let numero = aPartirDe; numero <= num_parcelas; numero++) {
+        // Usar Utilitario para data segura
+        const vencimento = Utilitario.adicionarMeses(dataBase, numero);
+
+        const valor = (numero === num_parcelas) ? ultimaParcela : valorParcelaBase;
+
+        await executor.query(
+          `INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, data_vencimento, status_parcela)
+           VALUES ($1, $2, $3, $4, 'pendente')`,
+          [id_emprestimo, numero, valor, vencimento]
+        );
       }
 
       return true;
@@ -72,9 +120,34 @@ export default class Parcela {
     }
   }
 
-  // --------------------------------------
-  // LISTAR PARCELAS DE UM EMPRÉSTIMO
-  // --------------------------------------
+  static async contarPagas(id_emprestimo: number, executor: Executor = database): Promise<number> {
+    const res = await executor.query(
+      `SELECT COUNT(*)::int AS total FROM Parcela WHERE id_emprestimo = $1 AND status_parcela = 'pago'`,
+      [id_emprestimo],
+    );
+    return res.rows[0]?.total ?? 0;
+  }
+
+  static async excluirParcelasPendentes(id_emprestimo: number, executor: Executor = database): Promise<void> {
+    await executor.query(
+      `DELETE FROM Parcela WHERE id_emprestimo = $1 AND status_parcela = 'pendente'`,
+      [id_emprestimo],
+    );
+  }
+
+  static async excluirPendentesPorCliente(id_cliente: number, executor: Executor = database): Promise<void> {
+    await executor.query(
+      `
+        DELETE FROM Parcela p
+        USING Emprestimo e
+        WHERE p.id_emprestimo = e.id_emprestimo
+          AND e.id_cliente = $1
+          AND p.status_parcela = 'pendente'
+      `,
+      [id_cliente],
+    );
+  }
+
   static async listarPorEmprestimo(id_emprestimo: number): Promise<ParcelaDTO[]> {
     try {
       const query = `
@@ -90,9 +163,23 @@ export default class Parcela {
     }
   }
 
-  // --------------------------------------
-  // BUSCAR PARCELA POR ID
-  // --------------------------------------
+  static async listarPorCliente(id_cliente: number): Promise<ParcelaDTO[]> {
+    try {
+      const query = `
+        SELECT p.*
+        FROM Parcela p
+        JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+        WHERE e.id_cliente = $1
+        ORDER BY e.id_emprestimo, p.numero_parcela ASC
+      `;
+      const res = await database.query(query, [id_cliente]);
+      return res.rows.map((r: any) => Parcela.toDTO(r));
+    } catch (error) {
+      console.error(`[ParcelaModel] Erro ao listar parcelas do cliente ${id_cliente}:`, error);
+      throw error;
+    }
+  }
+
   static async buscarPorId(id_parcela: number): Promise<ParcelaDTO> {
     try {
       const query = `SELECT * FROM Parcela WHERE id_parcela = $1`;
@@ -109,9 +196,6 @@ export default class Parcela {
     }
   }
 
-  // --------------------------------------
-  // DAR BAIXA (marcar como paga)
-  // --------------------------------------
   static async marcarComoPaga(id_parcela: number, data_pagamento?: Date): Promise<boolean> {
     try {
       const query = `
@@ -129,9 +213,6 @@ export default class Parcela {
     }
   }
 
-  // --------------------------------------
-  // DESFAZER PAGAMENTO
-  // --------------------------------------
   static async desfazerPagamento(id_parcela: number): Promise<boolean> {
     try {
       const query = `

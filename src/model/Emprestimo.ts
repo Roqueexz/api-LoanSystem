@@ -1,7 +1,8 @@
 import type EmprestimoDTO from '../interface/EmprestimoDTO.js';
-import { DatabaseModel } from './DatabaseModel.js';
+import databaseInstance from './DatabaseModel.js';
+import Parcela from './Parcela.js';
 
-const database = new DatabaseModel().pool;
+const database = databaseInstance.pool;
 
 export default class Emprestimo {
   private id_emprestimo: number = 0;
@@ -40,7 +41,6 @@ export default class Emprestimo {
     this.forma_pagamento = _forma_pagamento;
   }
 
-  // Getters e Setters
   public getIdEmprestimo(): number { return this.id_emprestimo; }
   public setIdEmprestimo(id: number): void { this.id_emprestimo = id; }
   public getIdCliente(): number { return this.id_cliente; }
@@ -64,7 +64,6 @@ export default class Emprestimo {
   public getFormaPagamento(): string | undefined { return this.forma_pagamento; }
   public setFormaPagamento(f: string): void { this.forma_pagamento = f; }
 
-  // Ajustado para bater certinho com a interface EmprestimoDTO
   private static toDTO(row: any): EmprestimoDTO {
     return {
       id_emprestimo: row.id_emprestimo,
@@ -83,16 +82,52 @@ export default class Emprestimo {
     };
   }
 
-  static async listarEmprestimos(): Promise<EmprestimoDTO[]> {
+  private static toParcelaInput(emprestimo: Emprestimo, id_emprestimo: number): EmprestimoDTO & { id_emprestimo: number } {
+    return {
+      id_emprestimo,
+      id_cliente: emprestimo.getIdCliente(),
+      valor_emprestimo: emprestimo.getValorEmprestimo(),
+      num_parcelas: emprestimo.getNumParcelas(),
+      valor_parcela: emprestimo.getValorParcela(),
+      tipo_juros: emprestimo.getTipoJuros(),
+      juros: emprestimo.getJuros(),
+      data_emprestimo: emprestimo.getDataEmprestimo(),
+      data_devolucao: emprestimo.getDataDevolucao(),
+      status_emprestimo: emprestimo.getStatusEmprestimo() ?? true,
+      forma_pagamento: emprestimo.getFormaPagamento() ?? null,
+    };
+  }
+
+  static async listarEmprestimos(
+    status: 'ativo' | 'quitado' | 'todos' = 'ativo',
+    id_cliente?: number,
+  ): Promise<EmprestimoDTO[]> {
     try {
-      // Corrigido: status_emprestimo em vez de status_emprestimo_registro
+      const condicoes: string[] = [];
+      const params: number[] = [];
+
+      if (status === 'ativo') {
+        condicoes.push('e.status_emprestimo = TRUE');
+      } else if (status === 'quitado') {
+        condicoes.push('e.status_emprestimo = FALSE');
+      }
+
+      if (typeof id_cliente === 'number') {
+        params.push(id_cliente);
+        condicoes.push(`e.id_cliente = $${params.length}`);
+      }
+
+      const where = condicoes.length > 0 ? `WHERE ${condicoes.join(' AND ')}` : '';
+
       const query = `
         SELECT e.*, c.nome AS nome_cliente, c.sobrenome AS sobrenome_cliente
         FROM Emprestimo e
         JOIN Cliente c ON e.id_cliente = c.id_cliente
-        WHERE e.status_emprestimo = TRUE
+        ${where}
+        ORDER BY e.id_emprestimo DESC
       `;
-      const res = await database.query(query);
+
+      const res = await database.query(query, params);
       return res.rows.map((r: any) => Emprestimo.toDTO(r));
     } catch (error) {
       console.error('[EmprestimoModel] Erro ao listar emprestimos:', error);
@@ -121,8 +156,12 @@ export default class Emprestimo {
     }
   }
 
-  static async cadastrarEmprestimo(emprestimo: Emprestimo): Promise<boolean> {
+  static async cadastrarEmprestimo(emprestimo: Emprestimo): Promise<number> {
+    const client = await database.connect();
+
     try {
+      await client.query('BEGIN');
+
       const query = `
         INSERT INTO Emprestimo (
           id_cliente, valor_emprestimo, num_parcelas, valor_parcela, tipo_juros, juros,
@@ -144,35 +183,80 @@ export default class Emprestimo {
         emprestimo.getFormaPagamento() ?? null,
       ];
 
-      const result = await database.query(query, valores);
+      const result = await client.query(query, valores);
       if (result.rows.length === 0) {
         throw new Error('INSERT não retornou ID.');
       }
 
-      console.info(`[EmprestimoModel] Empréstimo cadastrado. ID: ${result.rows[0].id_emprestimo}`);
-      return true;
+      const id_emprestimo = result.rows[0].id_emprestimo as number;
+      await Parcela.gerarParcelas(Emprestimo.toParcelaInput(emprestimo, id_emprestimo), client);
+
+      await client.query('COMMIT');
+      console.info(`[EmprestimoModel] Empréstimo cadastrado com parcelas. ID: ${id_emprestimo}`);
+      return id_emprestimo;
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error('[EmprestimoModel] Erro ao cadastrar emprestimo:', error);
       throw error;
+    } finally {
+      client.release();
     }
   }
 
   static async removerEmprestimo(id_emprestimo: number): Promise<boolean> {
+    const client = await database.connect();
+
     try {
-      // Corrigido nome da coluna status
-      const query = `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_emprestimo = $1`;
-      const res = await database.query(query, [id_emprestimo]);
+      await client.query('BEGIN');
+
+      await Parcela.excluirParcelasPendentes(id_emprestimo, client);
+
+      const res = await client.query(
+        `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_emprestimo = $1`,
+        [id_emprestimo],
+      );
+
+      await client.query('COMMIT');
       return (res.rowCount ?? 0) > 0;
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error(`[EmprestimoModel] Erro ao remover emprestimo (id: ${id_emprestimo}):`, error);
       throw error;
+    } finally {
+      client.release();
     }
   }
 
   static async atualizarEmprestimo(emprestimo: Emprestimo): Promise<boolean> {
+    const client = await database.connect();
+
     try {
-      const consulta = await Emprestimo.listarEmprestimo(emprestimo.getIdEmprestimo());
-      if (!consulta) return false;
+      const atual = await Emprestimo.listarEmprestimo(emprestimo.getIdEmprestimo());
+      if (!atual) return false;
+
+      const parcelasAlteradas =
+        atual.num_parcelas !== emprestimo.getNumParcelas() ||
+        atual.valor_parcela !== emprestimo.getValorParcela() ||
+        new Date(atual.data_emprestimo).getTime() !== emprestimo.getDataEmprestimo().getTime();
+
+      await client.query('BEGIN');
+
+      if (parcelasAlteradas) {
+        const pagas = await Parcela.contarPagas(emprestimo.getIdEmprestimo(), client);
+
+        if (emprestimo.getNumParcelas() < pagas) {
+          throw new Error(
+            `Não é possível reduzir para ${emprestimo.getNumParcelas()} parcelas: ${pagas} já foram pagas.`,
+          );
+        }
+
+        await Parcela.excluirParcelasPendentes(emprestimo.getIdEmprestimo(), client);
+        await Parcela.gerarParcelasRestantes(
+          Emprestimo.toParcelaInput(emprestimo, emprestimo.getIdEmprestimo()),
+          pagas + 1,
+          client,
+        );
+      }
 
       const query = `
         UPDATE Emprestimo SET
@@ -203,11 +287,15 @@ export default class Emprestimo {
         emprestimo.getIdEmprestimo(),
       ];
 
-      const res = await database.query(query, valores);
+      const res = await client.query(query, valores);
+      await client.query('COMMIT');
       return (res.rowCount ?? 0) > 0;
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error(`[EmprestimoModel] Erro ao atualizar emprestimo (id: ${emprestimo.getIdEmprestimo()}):`, error);
       throw error;
+    } finally {
+      client.release();
     }
   }
 }

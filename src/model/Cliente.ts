@@ -1,7 +1,10 @@
 import type ClienteDTO from "../interface/ClienteDTO.js";
-import { DatabaseModel } from "./DatabaseModel.js";
+import type ResumoClienteDTO from "../interface/ResumoClienteDTO.js";
+import databaseInstance from "./DatabaseModel.js";
+import Emprestimo from "./Emprestimo.js";
+import Parcela from "./Parcela.js";
 
-const database = new DatabaseModel().pool;
+const database = databaseInstance.pool;
 
 export default class Cliente {
   private id_cliente: number = 0;
@@ -11,7 +14,7 @@ export default class Cliente {
   private cidade: string;
   private estado: string;
   private criado_em: Date;
-  private status_cliente: boolean | undefined; // Adicionado para consistência de dados
+  private status_cliente: boolean | undefined;
 
   constructor(
     _nome: string,
@@ -83,6 +86,47 @@ export default class Cliente {
     }
   }
 
+  static async obterResumo(id_cliente: number): Promise<ResumoClienteDTO> {
+    const cliente = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
+    const emprestimos = await Emprestimo.listarEmprestimos('todos', id_cliente);
+
+    const emprestimosComParcelas = await Promise.all(
+      emprestimos.map(async (emp) => ({
+        ...emp,
+        parcelas: await Parcela.listarPorEmprestimo(emp.id_emprestimo!),
+      })),
+    );
+
+    const todasParcelas = emprestimosComParcelas.flatMap((emp) => emp.parcelas);
+
+    const total_emprestado = emprestimos
+      .filter((emp) => emp.status_emprestimo)
+      .reduce((acc, emp) => acc + Number(emp.valor_emprestimo), 0);
+
+    const total_recebido = todasParcelas
+      .filter((p) => p.status_parcela === 'PAGA')
+      .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
+
+    const total_em_aberto = todasParcelas
+      .filter((p) => p.status_parcela !== 'PAGA')
+      .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
+
+    const total_atrasado = todasParcelas
+      .filter((p) => p.status_parcela === 'ATRASADA')
+      .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
+
+    return {
+      cliente,
+      emprestimos: emprestimosComParcelas,
+      totais: {
+        total_emprestado,
+        total_recebido,
+        total_em_aberto,
+        total_atrasado,
+      },
+    };
+  }
+
   static async cadastrarCliente(cliente: Cliente): Promise<boolean> {
     try {
       const queryInsertCliente = `
@@ -125,7 +169,8 @@ export default class Cliente {
 
       await client.query("BEGIN");
 
-      // CORRIGIDO: status_emprestimo em vez de status_emprestimo_registro
+      await Parcela.excluirPendentesPorCliente(id_cliente, client);
+
       await client.query(
         `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_cliente = $1`,
         [id_cliente]
@@ -171,7 +216,7 @@ export default class Cliente {
         cliente.getTelefone(),
         cliente.getCidade().toUpperCase(),
         cliente.getEstado().toUpperCase(),
-        cliente.getIdCliente(), // CORRIGIDO: uso do getter público
+        cliente.getIdCliente(),
       ];
 
       const respostaBD = await database.query(queryAtualizarCliente, valores);

@@ -65,5 +65,11 @@ router.patch('/api/parcelas/:id/desfazer', Auth.verifyToken, ParcelaController.d
 // ROTAS DO CAIXA (BALANÇO FINANCEIRO - PROTEGIDA)
 // ============================================
 router.get('/api/caixa', Auth.verifyToken, CaixaController.resumo); 
+// ============================================
+// ROTAS DE RELATÓRIOS (PROTEGIDAS)
+// ============================================
+router.get('/api/caixa/diario', Auth.verifyToken, CaixaController.relatorioDiario);
+router.get('/api/caixa/mensal', Auth.verifyToken, CaixaController.relatorioMensal);
+router.get('/api/caixa/anual', Auth.verifyToken, CaixaController.relatorioAnual);
 
 export { router };

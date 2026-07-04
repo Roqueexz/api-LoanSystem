@@ -8,28 +8,29 @@ export default class CalculadoraFinanceira {
    * @returns Valor da parcela (sem arredondamento)
    */
   static calcularValorParcela(
-    valorTotal: number,
-    numParcelas: number,
-    juros: number,
-    tipoJuros: 'simples' | 'compostos'
-  ): number {
-    if (numParcelas <= 0) {
-      throw new Error('Número de parcelas deve ser maior que zero.');
-    }
-
-    const taxa = juros / 100;
-
-    if (tipoJuros === 'simples') {
-      // Juros simples: M = C * (1 + i * n)
-      const montante = valorTotal * (1 + taxa * numParcelas);
-      return montante / numParcelas;
-    } else {
-      // Juros compostos: M = C * (1 + i)^n
-      const montante = valorTotal * Math.pow(1 + taxa, numParcelas);
-      return montante / numParcelas;
-    }
+  valorTotal: number,
+  numParcelas: number,
+  juros: number,
+  tipoJuros: 'simples' | 'compostos'
+): number {
+  if (numParcelas <= 0) {
+    throw new Error('Numero de parcelas deve ser maior que zero.');
   }
 
+  const taxa = juros / 100;
+
+  if (juros === 0) {
+    return valorTotal / numParcelas;
+  }
+
+  if (tipoJuros === 'simples') {
+    const montante = valorTotal * (1 + taxa * numParcelas);
+    return montante / numParcelas;
+  } else {
+    const montante = valorTotal * Math.pow(1 + taxa, numParcelas);
+    return montante / numParcelas;
+  }
+}
   /**
    * Ajusta o valor da última parcela para fechar o valor total exato
    * @param valorTotal - Valor total do empréstimo

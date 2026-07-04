@@ -214,29 +214,40 @@ export default class Emprestimo {
     }
   }
 
-  static async removerEmprestimo(id_emprestimo: number): Promise<boolean> {
-    const client = await database.connect();
+static async removerEmprestimo(id_emprestimo: number): Promise<boolean> {
+  const client = await database.connect();
 
-    try {
-      await client.query('BEGIN');
-
-      await Parcela.excluirParcelasPendentes(id_emprestimo, client);
-
-      const res = await client.query(
-        `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_emprestimo = $1`,
-        [id_emprestimo],
+  try {
+    // VERIFICAR SE HÁ PARCELAS PAGAS
+    const pagas = await Parcela.contarPagas(id_emprestimo, client);
+    if (pagas > 0) {
+      throw new Error(
+        `Não é possível inativar empréstimo com ${pagas} parcela(s) paga(s). ` +
+        `Para remover, primeiro desfaça os pagamentos.`
       );
-
-      await client.query('COMMIT');
-      return (res.rowCount ?? 0) > 0;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error(`[EmprestimoModel] Erro ao remover emprestimo (id: ${id_emprestimo}):`, error);
-      throw error;
-    } finally {
-      client.release();
     }
+
+    await client.query('BEGIN');
+
+    // Excluir parcelas pendentes
+    await Parcela.excluirParcelasPendentes(id_emprestimo, client);
+
+    // Inativar empréstimo
+    const res = await client.query(
+      `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_emprestimo = $1`,
+      [id_emprestimo],
+    );
+
+    await client.query('COMMIT');
+    return (res.rowCount ?? 0) > 0;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error(`[EmprestimoModel] Erro ao remover emprestimo (id: ${id_emprestimo}):`, error);
+    throw error;
+  } finally {
+    client.release();
   }
+}
 
   static async atualizarEmprestimo(emprestimo: Emprestimo): Promise<boolean> {
     const client = await database.connect();

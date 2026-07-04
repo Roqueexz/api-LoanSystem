@@ -4,6 +4,9 @@ import type { Request, Response } from "express";
 // Importação do middleware de Autenticação
 import { Auth } from "./middleware/Auth.js";
 
+// Importação do Rate Limiter
+import { loginLimiter } from './middleware/RateLimiter.js';
+
 // Importação dos Controllers
 import ClienteController from "./controller/ClienteController.js";
 import EmprestimoController from './controller/EmprestimoController.js';
@@ -28,7 +31,7 @@ router.get("/api", (req: Request, res: Response) => {
 });
 
 // 🔓 Rota Pública: Realizar login e obter o token JWT
-router.post('/api/login', validate(LoginSchema), authController.login);
+router.post('/api/login', loginLimiter, validate(LoginSchema), authController.login);
 
 // ============================================
 // ROTAS DE CLIENTES (TODAS PROTEGIDAS)

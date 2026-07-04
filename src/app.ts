@@ -1,5 +1,6 @@
 import { server } from "./server.js";
 import { DatabaseModel } from "./model/DatabaseModel.js";
+import logger from "./services/Logger.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -11,14 +12,13 @@ new DatabaseModel()
   .then((resbd) => {
     if (resbd) {
       server.listen(port, () => {
-        console.log(`✅ Servidor rodando em http://localhost:${port}`);
-        console.log(`📊 Banco: ${process.env.DB_NAME}`);
-        console.log(`🔒 CORS permitido: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+        logger.info({ port, db: process.env.DB_NAME }, 'Servidor iniciado com sucesso');
+        logger.info(`🔒 CORS permitido: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
       });
     } else {
-      console.log("❌ Nao foi possivel conectar ao banco de dados");
+      logger.error('Nao foi possivel conectar ao banco de dados');
     }
   })
   .catch((err: unknown) => {
-    console.error("❌ Erro ao testar conexao com o banco de dados:", err);
+    logger.error({ error: err }, 'Erro ao testar conexao com o banco de dados');
   });

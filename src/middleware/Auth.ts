@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { type Request, type Response, type NextFunction } from 'express';
 import Usuario from '../model/Usuario.js';
+import logger from '../services/Logger.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -21,6 +22,7 @@ export class Auth {
         const { email, senha } = req.body;
 
         if (!email || !senha) {
+            logger.warn({ email }, 'Tentativa de login sem email ou senha');
             return res.status(400).json({
                 auth: false,
                 message: "Email e senha sao obrigatorios."
@@ -31,6 +33,7 @@ export class Auth {
             const usuario = await Usuario.validarSenha(email, senha);
 
             if (!usuario) {
+                logger.warn({ email }, 'Tentativa de login com credenciais invalidas');
                 return res.status(401).json({
                     auth: false,
                     message: "Email e/ou senha incorretos"
@@ -51,6 +54,8 @@ export class Auth {
                 usuario.role
             );
 
+            logger.info({ userId: usuario.id_usuario, email: usuario.email }, 'Login realizado com sucesso');
+
             return res.status(200).json({
                 auth: true,
                 token: tokenUsuario,
@@ -58,7 +63,7 @@ export class Auth {
             });
 
         } catch (error) {
-            console.error(`[Auth] Erro no login: ${error}`);
+            logger.error({ error, email }, 'Erro no login');
             return res.status(500).json({
                 auth: false,
                 message: "Erro interno do servidor"
@@ -78,7 +83,7 @@ export class Auth {
         const token = req.headers['x-access-token'] as string;
 
         if (!token) {
-            console.log('[Auth] Token nao informado');
+            logger.warn('Token nao informado na requisicao');
             return res.status(401).json({
                 message: "Token nao informado",
                 auth: false
@@ -88,13 +93,13 @@ export class Auth {
         jwt.verify(token, SECRET, (err, decoded) => {
             if (err) {
                 if (err.name === 'TokenExpiredError') {
-                    console.log('[Auth] Token expirado');
+                    logger.warn({ token }, 'Token expirado');
                     return res.status(401).json({
                         message: "Token expirado, faca o login novamente",
                         auth: false
                     });
                 } else {
-                    console.log('[Auth] Token invalido');
+                    logger.warn({ token }, 'Token invalido');
                     return res.status(401).json({
                         message: "Token invalido, faca o login",
                         auth: false
@@ -103,7 +108,7 @@ export class Auth {
             }
 
             if (!decoded) {
-                console.log('[Auth] Token nao pode ser decodificado');
+                logger.warn('Token nao pode ser decodificado');
                 return res.status(401).json({
                     message: "Token invalido, faca o login",
                     auth: false
@@ -113,7 +118,7 @@ export class Auth {
             const { exp, id } = decoded as JwtPayload;
 
             if (!exp || !id) {
-                console.log('[Auth] Data de expiracao ou ID nao encontrada no token');
+                logger.warn('Data de expiracao ou ID nao encontrada no token');
                 return res.status(401).json({
                     message: "Token invalido, faca o login",
                     auth: false
@@ -122,7 +127,7 @@ export class Auth {
 
             const currentTime = Math.floor(Date.now() / 1000);
             if (currentTime > exp) {
-                console.log('[Auth] Token expirado');
+                logger.warn({ token }, 'Token expirado');
                 return res.status(401).json({
                     message: "Token expirado, faca o login novamente",
                     auth: false

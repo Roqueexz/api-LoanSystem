@@ -1,5 +1,4 @@
 import { type Request, type Response } from "express";
-
 import Caixa from "../model/Caixa.js";
 
 export default class CaixaController {

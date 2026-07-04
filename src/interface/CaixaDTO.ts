@@ -1,6 +1,6 @@
 export default interface CaixaDTO {
-    totalEmprestado: number;
-    totalRecebido: number;
-    entradaPendente: number;
-    lucroPrevisto: number;
+    totalEmprestado: number;    // Total emprestado (ativos)
+    totalRecebido: number;      // Total recebido (parcelas pagas)
+    entradaPendente: number;    // Total a receber (parcelas pendentes + atrasadas)
+    lucroPrevisto: number;      // Lucro previsto (juros futuros)
 }

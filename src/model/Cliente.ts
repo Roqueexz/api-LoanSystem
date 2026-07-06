@@ -3,6 +3,7 @@ import type ResumoClienteDTO from "../interface/ResumoClienteDTO.js";
 import databaseInstance from "./DatabaseModel.js";
 import Emprestimo from "./Emprestimo.js";
 import Parcela from "./Parcela.js";
+import { capitalizar, formatarTelefone } from '../services/Utilitario.js';
 
 const database = databaseInstance.pool;
 
@@ -25,11 +26,11 @@ export default class Cliente {
     _criado_em: Date,
     _status_cliente?: boolean
   ) {
-    this.nome = _nome;
-    this.sobrenome = _sobrenome;
+    this.nome = capitalizar(_nome);
+    this.sobrenome = capitalizar(_sobrenome);
     this.telefone = _telefone;
-    this.cidade = _cidade;
-    this.estado = _estado;
+    this.cidade = capitalizar(_cidade);
+    this.estado = _estado.toUpperCase();
     this.criado_em = _criado_em;
     this.status_cliente = _status_cliente;
   }
@@ -37,17 +38,17 @@ export default class Cliente {
   public getIdCliente(): number { return this.id_cliente; }
   public setIdCliente(id: number): void { this.id_cliente = id; }
   public getNome(): string { return this.nome; }
-  public setNome(nome: string): void { this.nome = nome; }
+  public setNome(nome: string): void { this.nome = capitalizar(nome); }
   public getSobrenome(): string { return this.sobrenome; }
-  public setSobrenome(sobrenome: string): void { this.sobrenome = sobrenome; }
+  public setSobrenome(sobrenome: string): void { this.sobrenome = capitalizar(sobrenome); }
   public getTelefone(): string { return this.telefone; }
   public setTelefone(telefone: string): void { this.telefone = telefone; }
   public getCriadoEm(): Date { return this.criado_em; }
   public setCriadoEm(criado_em: Date): void { this.criado_em = criado_em; }
   public getCidade(): string { return this.cidade; }
-  public setCidade(cidade: string): void { this.cidade = cidade; }
+  public setCidade(cidade: string): void { this.cidade = capitalizar(cidade); }
   public getEstado(): string { return this.estado; }
-  public setEstado(estado: string): void { this.estado = estado; }
+  public setEstado(estado: string): void { this.estado = estado.toUpperCase(); }
   public getStatusCliente(): boolean | undefined { return this.status_cliente; }
   public setStatusCliente(status: boolean): void { this.status_cliente = status; }
 
@@ -56,7 +57,7 @@ export default class Cliente {
       id_cliente: cliente.id_cliente,
       nome_cliente: cliente.nome,
       sobrenome_cliente: cliente.sobrenome,
-      telefone: cliente.telefone,
+      telefone: formatarTelefone(cliente.telefone),
       cidade: cliente.cidade,
       estado: cliente.estado,
       criado_em: cliente.criado_em,
@@ -87,45 +88,46 @@ export default class Cliente {
   }
 
   static async obterResumo(id_cliente: number): Promise<ResumoClienteDTO> {
-  const cliente = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
-  const emprestimos = await Emprestimo.listarEmprestimos('todos', id_cliente);
+    const cliente = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
+    const emprestimos = await Emprestimo.listarEmprestimos('todos', id_cliente);
 
-  const emprestimosComParcelas = await Promise.all(
-    emprestimos.map(async (emp) => ({
-      ...emp,
-      parcelas: await Parcela.listarPorEmprestimo(emp.id_emprestimo!),
-    })),
-  );
+    const emprestimosComParcelas = await Promise.all(
+      emprestimos.map(async (emp) => ({
+        ...emp,
+        parcelas: await Parcela.listarPorEmprestimo(emp.id_emprestimo!),
+      })),
+    );
 
-  const todasParcelas = emprestimosComParcelas.flatMap((emp) => emp.parcelas);
+    const todasParcelas = emprestimosComParcelas.flatMap((emp) => emp.parcelas);
 
-  const total_emprestado = emprestimos
-    .filter((emp) => emp.status_emprestimo)
-    .reduce((acc, emp) => acc + Number(emp.valor_emprestimo), 0);
+    const total_emprestado = emprestimos
+      .filter((emp) => emp.status_emprestimo)
+      .reduce((acc, emp) => acc + Number(emp.valor_emprestimo), 0);
 
-  const total_recebido = todasParcelas
-    .filter((p) => p.status_parcela === 'PAGA')
-    .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
+    const total_recebido = todasParcelas
+      .filter((p) => p.status_parcela === 'PAGA')
+      .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
 
-  const total_em_aberto = todasParcelas
-    .filter((p) => p.status_parcela !== 'PAGA')
-    .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
+    const total_em_aberto = todasParcelas
+      .filter((p) => p.status_parcela !== 'PAGA')
+      .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
 
-  const total_atrasado = todasParcelas
-    .filter((p) => p.status_parcela === 'ATRASADA')
-    .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
+    const total_atrasado = todasParcelas
+      .filter((p) => p.status_parcela === 'ATRASADA')
+      .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
 
-  return {
-    cliente,
-    emprestimos: emprestimosComParcelas,
-    totais: {
-      total_emprestado,
-      total_recebido,
-      total_em_aberto,
-      total_atrasado,
-    },
-  };
-}
+    return {
+      cliente,
+      emprestimos: emprestimosComParcelas,
+      totais: {
+        total_emprestado,
+        total_recebido,
+        total_em_aberto,
+        total_atrasado,
+      },
+    };
+  }
+
   static async cadastrarCliente(cliente: Cliente): Promise<boolean> {
     try {
       const queryInsertCliente = `
@@ -135,11 +137,11 @@ export default class Cliente {
       `;
 
       const valores = [
-        cliente.getNome().toUpperCase(),
-        cliente.getSobrenome().toUpperCase(),
+        cliente.getNome(),
+        cliente.getSobrenome(),
         cliente.getTelefone(),
-        cliente.getCidade().toUpperCase(),
-        cliente.getEstado().toUpperCase(),
+        cliente.getCidade(),
+        cliente.getEstado(),
         cliente.getCriadoEm(),
       ];
 
@@ -156,60 +158,56 @@ export default class Cliente {
     }
   }
 
- static async removerCliente(id_cliente: number): Promise<boolean> {
-  const client = await database.connect();
+  static async removerCliente(id_cliente: number): Promise<boolean> {
+    const client = await database.connect();
 
-  try {
-    const cliente: ClienteDTO = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
+    try {
+      const cliente: ClienteDTO = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
 
-    if (!cliente.status_cliente) {
-      return false;
-    }
+      if (!cliente.status_cliente) {
+        return false;
+      }
 
-    // VERIFICAR SE HÁ PARCELAS PAGAS
-    const queryPagas = `
-      SELECT COUNT(*)::int AS total
-      FROM Parcela p
-      JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-      WHERE e.id_cliente = $1 AND p.status_parcela = 'pago'
-    `;
-    const resultPagas = await client.query(queryPagas, [id_cliente]);
-    const pagas = resultPagas.rows[0]?.total ?? 0;
+      const queryPagas = `
+        SELECT COUNT(*)::int AS total
+        FROM Parcela p
+        JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+        WHERE e.id_cliente = $1 AND p.status_parcela = 'pago'
+      `;
+      const resultPagas = await client.query(queryPagas, [id_cliente]);
+      const pagas = resultPagas.rows[0]?.total ?? 0;
 
-    if (pagas > 0) {
-      throw new Error(
-        `Não é possível inativar cliente com ${pagas} parcela(s) paga(s). ` +
-        `Para remover, primeiro desfaça os pagamentos.`
+      if (pagas > 0) {
+        throw new Error(
+          `Não é possível inativar cliente com ${pagas} parcela(s) paga(s). ` +
+          `Para remover, primeiro desfaça os pagamentos.`
+        );
+      }
+
+      await client.query("BEGIN");
+
+      await Parcela.excluirPendentesPorCliente(id_cliente, client);
+
+      await client.query(
+        `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_cliente = $1`,
+        [id_cliente]
       );
+
+      const result = await client.query(
+        `UPDATE Cliente SET status_cliente = FALSE WHERE id_cliente = $1`,
+        [id_cliente]
+      );
+
+      await client.query("COMMIT");
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error(`[ClienteModel] Erro ao remover cliente (id: ${id_cliente}):`, error);
+      throw error;
+    } finally {
+      client.release();
     }
-
-    await client.query("BEGIN");
-
-    // Excluir parcelas pendentes do cliente
-    await Parcela.excluirPendentesPorCliente(id_cliente, client);
-
-    // Inativar todos os empréstimos do cliente
-    await client.query(
-      `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_cliente = $1`,
-      [id_cliente]
-    );
-
-    // Inativar cliente
-    const result = await client.query(
-      `UPDATE Cliente SET status_cliente = FALSE WHERE id_cliente = $1`,
-      [id_cliente]
-    );
-
-    await client.query("COMMIT");
-    return (result.rowCount ?? 0) > 0;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error(`[ClienteModel] Erro ao remover cliente (id: ${id_cliente}):`, error);
-    throw error;
-  } finally {
-    client.release();
   }
-}
 
   static async atualizarCliente(cliente: Cliente): Promise<boolean> {
     try {
@@ -230,11 +228,11 @@ export default class Cliente {
       `;
 
       const valores = [
-        cliente.getNome().toUpperCase(),
-        cliente.getSobrenome().toUpperCase(),
+        cliente.getNome(),
+        cliente.getSobrenome(),
         cliente.getTelefone(),
-        cliente.getCidade().toUpperCase(),
-        cliente.getEstado().toUpperCase(),
+        cliente.getCidade(),
+        cliente.getEstado(),
         cliente.getIdCliente(),
       ];
 

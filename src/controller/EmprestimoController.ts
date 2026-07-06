@@ -1,5 +1,7 @@
 import Emprestimo from "../model/Emprestimo.js";
 import { type Request, type Response } from "express";
+import logger from "../services/Logger.js";
+import { isNumeroValido } from "../services/Utilitario.js";
 
 export default class EmprestimoController {
   static async todos(req: Request, res: Response) {
@@ -21,7 +23,7 @@ export default class EmprestimoController {
       }
       res.status(200).json(lista);
     } catch (error) {
-      console.error(`[EmprestimoController] Erro ao listar emprestimos:`, error);
+      logger.error({ error }, "[EmprestimoController] Erro ao listar emprestimos");
       res.status(500).json({ mensagem: "Erro interno ao recuperar emprestimos." });
     }
   }
@@ -29,7 +31,8 @@ export default class EmprestimoController {
   static async emprestimo(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id as string);
-      if (isNaN(id) || id <= 0) {
+
+      if (!isNumeroValido(id)) {
         res.status(400).json({ mensagem: "ID invalido. Informe um numero inteiro positivo." });
         return;
       }
@@ -37,7 +40,8 @@ export default class EmprestimoController {
       const emp = await Emprestimo.listarEmprestimo(id);
       res.status(200).json(emp);
     } catch (error: any) {
-      console.error(`[EmprestimoController] Erro ao buscar emprestimo (id: ${req.params.id}):`, error);
+      logger.error({ error, id: req.params.id }, "[EmprestimoController] Erro ao buscar emprestimo");
+      
       if (error.message?.includes("nao encontrado")) {
         res.status(404).json({ mensagem: error.message });
         return;
@@ -48,7 +52,6 @@ export default class EmprestimoController {
 
   static async cadastrar(req: Request, res: Response) {
     try {
-      // Zod ja validou os dados
       const dados = req.body;
 
       const valorParcela = dados.valor_parcela ? Number(dados.valor_parcela) : 0;
@@ -73,7 +76,7 @@ export default class EmprestimoController {
         res.status(400).json({ mensagem: "Nao foi possivel cadastrar o emprestimo." });
       }
     } catch (error: any) {
-      console.error(`[EmprestimoController] Erro ao cadastrar emprestimo:`, error);
+      logger.error({ error }, "[EmprestimoController] Erro ao cadastrar emprestimo");
       
       if (error.message?.includes("Soma das parcelas")) {
         res.status(400).json({ mensagem: error.message });
@@ -87,7 +90,8 @@ export default class EmprestimoController {
   static async remover(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id as string);
-      if (isNaN(id) || id <= 0) {
+
+      if (!isNumeroValido(id)) {
         res.status(400).json({ mensagem: "ID invalido. Informe um numero inteiro positivo." });
         return;
       }
@@ -99,7 +103,7 @@ export default class EmprestimoController {
         res.status(404).json({ mensagem: "Emprestimo nao encontrado." });
       }
     } catch (error: any) {
-      console.error(`[EmprestimoController] Erro ao remover emprestimo (id: ${req.params.id}):`, error);
+      logger.error({ error, id: req.params.id }, "[EmprestimoController] Erro ao remover emprestimo");
       
       if (error.message?.includes("parcelas pagas")) {
         res.status(400).json({ mensagem: error.message });
@@ -113,12 +117,12 @@ export default class EmprestimoController {
   static async atualizar(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id as string);
-      if (isNaN(id) || id <= 0) {
+
+      if (!isNumeroValido(id)) {
         res.status(400).json({ mensagem: "ID invalido. Informe um numero inteiro positivo." });
         return;
       }
 
-      // Zod ja validou os dados
       const dados = req.body;
 
       const valorParcela = dados.valor_parcela ? Number(dados.valor_parcela) : 0;
@@ -144,7 +148,7 @@ export default class EmprestimoController {
         res.status(404).json({ mensagem: "Emprestimo nao encontrado ou sem alteracoes." });
       }
     } catch (error: any) {
-      console.error(`[EmprestimoController] Erro ao atualizar emprestimo (id: ${req.params.id}):`, error);
+      logger.error({ error, id: req.params.id }, "[EmprestimoController] Erro ao atualizar emprestimo");
       
       if (error.message?.includes("Soma das parcelas")) {
         res.status(400).json({ mensagem: error.message });

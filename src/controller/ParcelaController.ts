@@ -1,6 +1,8 @@
 import Parcela from "../model/Parcela.js";
 import databaseInstance from "../model/DatabaseModel.js";
 import { type Request, type Response } from "express";
+import logger from "../services/Logger.js";
+import { isNumeroValido } from "../services/Utilitario.js";
 
 const database = databaseInstance.pool;
 
@@ -8,7 +10,8 @@ export default class ParcelaController {
   static async porEmprestimo(req: Request, res: Response) {
     try {
       const id_emprestimo = parseInt(req.params.id as string);
-      if (isNaN(id_emprestimo) || id_emprestimo <= 0) {
+      
+      if (!isNumeroValido(id_emprestimo)) {
         res.status(400).json({ mensagem: "ID do emprestimo invalido." });
         return;
       }
@@ -22,7 +25,7 @@ export default class ParcelaController {
 
       res.status(200).json(parcelas);
     } catch (error) {
-      console.error(`[ParcelaController] Erro ao listar parcelas (emprestimo: ${req.params.id}):`, error);
+      logger.error({ error, id: req.params.id }, "[ParcelaController] Erro ao listar parcelas");
       res.status(500).json({ mensagem: "Erro interno ao listar parcelas." });
     }
   }
@@ -30,7 +33,8 @@ export default class ParcelaController {
   static async parcela(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id as string);
-      if (isNaN(id) || id <= 0) {
+      
+      if (!isNumeroValido(id)) {
         res.status(400).json({ mensagem: "ID invalido. Informe um numero inteiro positivo." });
         return;
       }
@@ -38,7 +42,8 @@ export default class ParcelaController {
       const parcela = await Parcela.buscarPorId(id);
       res.status(200).json(parcela);
     } catch (error: any) {
-      console.error(`[ParcelaController] Erro ao buscar parcela (id: ${req.params.id}):`, error);
+      logger.error({ error, id: req.params.id }, "[ParcelaController] Erro ao buscar parcela");
+      
       if (error.message?.includes("nao encontrada")) {
         res.status(404).json({ mensagem: error.message });
         return;
@@ -50,7 +55,8 @@ export default class ParcelaController {
   static async pagar(req: Request, res: Response) {
     try {
       const id_parcela = parseInt(req.params.id as string);
-      if (isNaN(id_parcela) || id_parcela <= 0) {
+      
+      if (!isNumeroValido(id_parcela)) {
         res.status(400).json({ mensagem: "ID da parcela invalido." });
         return;
       }
@@ -67,7 +73,7 @@ export default class ParcelaController {
         res.status(404).json({ mensagem: "Parcela nao encontrada." });
       }
     } catch (error) {
-      console.error(`[ParcelaController] Erro ao dar baixa na parcela (id: ${req.params.id}):`, error);
+      logger.error({ error, id: req.params.id }, "[ParcelaController] Erro ao dar baixa na parcela");
       res.status(500).json({ mensagem: "Erro interno ao dar baixa na parcela." });
     }
   }
@@ -75,7 +81,8 @@ export default class ParcelaController {
   static async desfazer(req: Request, res: Response) {
     try {
       const id_parcela = parseInt(req.params.id as string);
-      if (isNaN(id_parcela) || id_parcela <= 0) {
+      
+      if (!isNumeroValido(id_parcela)) {
         res.status(400).json({ mensagem: "ID da parcela invalido." });
         return;
       }
@@ -88,7 +95,7 @@ export default class ParcelaController {
         res.status(404).json({ mensagem: "Parcela nao encontrada." });
       }
     } catch (error) {
-      console.error(`[ParcelaController] Erro ao desfazer pagamento (id: ${req.params.id}):`, error);
+      logger.error({ error, id: req.params.id }, "[ParcelaController] Erro ao desfazer pagamento");
       res.status(500).json({ mensagem: "Erro interno ao desfazer pagamento." });
     }
   }
@@ -97,6 +104,12 @@ export default class ParcelaController {
     try {
       const { status } = req.query;
       const id_cliente = req.query.id_cliente ? Number(req.query.id_cliente) : undefined;
+
+      // Validar id_cliente se fornecido
+      if (id_cliente !== undefined && !isNumeroValido(id_cliente)) {
+        res.status(400).json({ mensagem: "ID do cliente invalido." });
+        return;
+      }
 
       let parcelas: any[] = [];
 
@@ -134,7 +147,7 @@ export default class ParcelaController {
 
       res.status(200).json(filtradas);
     } catch (error) {
-      console.error('[ParcelaController] Erro ao listar parcelas por status:', error);
+      logger.error({ error }, "[ParcelaController] Erro ao listar parcelas por status");
       res.status(500).json({ mensagem: "Erro interno ao listar parcelas." });
     }
   }

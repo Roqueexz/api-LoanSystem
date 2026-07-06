@@ -1,6 +1,8 @@
 import Cliente from "../model/Cliente.js";
 import { type Request, type Response } from "express";
 import type ClienteDTO from "../interface/ClienteDTO.js";
+import logger from "../services/Logger.js";
+import { isNumeroValido } from "../services/Utilitario.js";
 
 export default class ClienteController {
 
@@ -20,7 +22,7 @@ export default class ClienteController {
 
       res.status(200).json(listaDeClientes);
     } catch (error) {
-      console.error(`[ClienteController] Erro ao listar clientes:`, error);
+      logger.error({ error }, "[ClienteController] Erro ao listar clientes");
       res.status(500).json({
         mensagem: "Erro interno ao recuperar a lista de clientes."
       });
@@ -31,7 +33,7 @@ export default class ClienteController {
     try {
       const idCliente = parseInt(req.params.id as string);
 
-      if (isNaN(idCliente) || idCliente <= 0) {
+      if (!isNumeroValido(idCliente)) {
         res.status(400).json({
           mensagem: "ID invalido. Informe um numero inteiro positivo."
         });
@@ -41,7 +43,7 @@ export default class ClienteController {
       const cliente = await Cliente.listarClientes(idCliente);
       res.status(200).json(cliente);
     } catch (error: any) {
-      console.error(`[ClienteController] Erro ao buscar cliente (id: ${req.params.id}):`, error);
+      logger.error({ error, id: req.params.id }, "[ClienteController] Erro ao buscar cliente");
 
       if (error.message?.includes("não encontrado")) {
         res.status(404).json({ mensagem: error.message });
@@ -56,7 +58,6 @@ export default class ClienteController {
 
   static async cadastrar(req: Request, res: Response) {
     try {
-      // Zod ja validou os dados, pode confiar
       const dadosRecebidos = req.body;
 
       const novoCliente = new Cliente(
@@ -76,7 +77,7 @@ export default class ClienteController {
         res.status(400).json({ mensagem: "Nao foi possivel cadastrar o cliente." });
       }
     } catch (error) {
-      console.error(`[ClienteController] Erro ao cadastrar cliente:`, error);
+      logger.error({ error }, "[ClienteController] Erro ao cadastrar cliente");
       res.status(500).json({
         mensagem: "Erro interno ao cadastrar o cliente."
       });
@@ -87,7 +88,7 @@ export default class ClienteController {
     try {
       const idCliente = parseInt(req.params.id as string);
 
-      if (isNaN(idCliente) || idCliente <= 0) {
+      if (!isNumeroValido(idCliente)) {
         res.status(400).json({
           mensagem: "ID invalido. Informe um numero inteiro positivo."
         });
@@ -117,7 +118,7 @@ export default class ClienteController {
         });
       }
     } catch (error: any) {
-      console.error(`[ClienteController] Erro ao atualizar cliente (id: ${req.params.id}):`, error);
+      logger.error({ error, id: req.params.id }, "[ClienteController] Erro ao atualizar cliente");
 
       if (error.message?.includes("nao encontrado")) {
         res.status(404).json({ mensagem: error.message });
@@ -134,7 +135,7 @@ export default class ClienteController {
     try {
       const idCliente = parseInt(req.params.id as string);
 
-      if (isNaN(idCliente) || idCliente <= 0) {
+      if (!isNumeroValido(idCliente)) {
         res.status(400).json({
           mensagem: "ID invalido. Informe um numero inteiro positivo."
         });
@@ -151,7 +152,7 @@ export default class ClienteController {
         });
       }
     } catch (error: any) {
-      console.error(`[ClienteController] Erro ao remover cliente (id: ${req.params.id}):`, error);
+      logger.error({ error, id: req.params.id }, "[ClienteController] Erro ao remover cliente");
 
       if (error.message?.includes("nao encontrado")) {
         res.status(404).json({ mensagem: error.message });
@@ -168,7 +169,7 @@ export default class ClienteController {
     try {
       const idCliente = parseInt(req.params.id as string);
 
-      if (isNaN(idCliente) || idCliente <= 0) {
+      if (!isNumeroValido(idCliente)) {
         res.status(400).json({
           mensagem: "ID invalido. Informe um numero inteiro positivo."
         });
@@ -178,7 +179,7 @@ export default class ClienteController {
       const resumo = await Cliente.obterResumo(idCliente);
       res.status(200).json(resumo);
     } catch (error: any) {
-      console.error(`[ClienteController] Erro ao buscar resumo do cliente (id: ${req.params.id}):`, error);
+      logger.error({ error, id: req.params.id }, "[ClienteController] Erro ao buscar resumo do cliente");
 
       if (error.message?.includes("nao encontrado")) {
         res.status(404).json({ mensagem: error.message });

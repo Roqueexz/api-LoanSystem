@@ -3,7 +3,7 @@ import type ParcelaDTO from '../interface/ParcelaDTO.js';
 import type EmprestimoDTO from '../interface/EmprestimoDTO.js';
 import type pg from 'pg';
 import CalculadoraFinanceira from '../services/CalculadoraFinanceira.js';
-import Utilitario from '../services/Utilitario.js';
+import { adicionarMeses } from '../services/Utilitario.js';
 
 const database = databaseInstance.pool;
 type Executor = pg.Pool | pg.PoolClient;
@@ -102,7 +102,7 @@ export default class Parcela {
 
       for (let numero = aPartirDe; numero <= num_parcelas; numero++) {
         // Usar Utilitario para data segura
-        const vencimento = Utilitario.adicionarMeses(dataBase, numero);
+        const vencimento = adicionarMeses(dataBase, numero);
 
         const valor = (numero === num_parcelas) ? ultimaParcela : valorParcelaBase;
 

@@ -1,5 +1,6 @@
 import databaseInstance from "./DatabaseModel.js";
 import bcrypt from "bcrypt";
+import { capitalizar, isEmailValido } from '../services/Utilitario.js';
 
 const database = databaseInstance.pool;
 
@@ -27,8 +28,8 @@ export default class Usuario {
     _role: string = "admin",
     _criado_em?: Date
   ) {
-    this.nome = _nome;
-    this.email = _email;
+    this.nome = capitalizar(_nome);
+    this.email = _email.toLowerCase().trim();
     this.senha = _senha;
     this.role = _role;
     this.criado_em = _criado_em || new Date();
@@ -37,9 +38,9 @@ export default class Usuario {
   public getIdUsuario(): number { return this.id_usuario; }
   public setIdUsuario(id: number): void { this.id_usuario = id; }
   public getNome(): string { return this.nome; }
-  public setNome(nome: string): void { this.nome = nome; }
+  public setNome(nome: string): void { this.nome = capitalizar(nome); }
   public getEmail(): string { return this.email; }
-  public setEmail(email: string): void { this.email = email; }
+  public setEmail(email: string): void { this.email = email.toLowerCase().trim(); }
   public getSenha(): string { return this.senha; }
   public setSenha(senha: string): void { this.senha = senha; }
   public getRole(): string { return this.role; }
@@ -58,10 +59,22 @@ export default class Usuario {
     };
   }
 
+  /**
+   * Valida se o email é valido antes de buscar
+   */
+  private static validarEmail(email: string): void {
+    if (!isEmailValido(email)) {
+      throw new Error('Email invalido. Por favor, insira um email valido.');
+    }
+  }
+
   static async buscarPorEmail(email: string): Promise<UsuarioDTO | null> {
     try {
+      Usuario.validarEmail(email);
+      const emailLower = email.toLowerCase().trim();
+
       const query = `SELECT * FROM usuario WHERE email = $1`;
-      const res = await database.query(query, [email]);
+      const res = await database.query(query, [emailLower]);
 
       if (res.rows.length === 0) {
         return null;
@@ -92,6 +105,9 @@ export default class Usuario {
 
   static async cadastrar(usuario: Usuario): Promise<number> {
     try {
+      // Validar email antes de cadastrar
+      Usuario.validarEmail(usuario.getEmail());
+
       const saltRounds = 10;
       const senhaHash = await bcrypt.hash(usuario.getSenha(), saltRounds);
 
@@ -124,7 +140,10 @@ export default class Usuario {
 
   static async validarSenha(email: string, senhaPlain: string): Promise<UsuarioDTO | null> {
     try {
-      const usuario = await Usuario.buscarPorEmail(email);
+      Usuario.validarEmail(email);
+      const emailLower = email.toLowerCase().trim();
+
+      const usuario = await Usuario.buscarPorEmail(emailLower);
 
       if (!usuario) {
         return null;

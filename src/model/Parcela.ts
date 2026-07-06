@@ -3,7 +3,7 @@ import type ParcelaDTO from '../interface/ParcelaDTO.js';
 import type EmprestimoDTO from '../interface/EmprestimoDTO.js';
 import type pg from 'pg';
 import CalculadoraFinanceira from '../services/CalculadoraFinanceira.js';
-import { adicionarMeses } from '../services/Utilitario.js';
+import { adicionarMeses, isDataValida } from '../services/Utilitario.js';
 
 const database = databaseInstance.pool;
 type Executor = pg.Pool | pg.PoolClient;
@@ -57,11 +57,16 @@ export default class Parcela {
         data_emprestimo
       } = emprestimo;
 
+      // Validar data do emprestimo
+      if (!isDataValida(data_emprestimo)) {
+        throw new Error('Data do emprestimo invalida.');
+      }
+
       // DETERMINAR VALOR DA PARCELA
       let valorParcelaBase: number;
 
       if (valorParcelaInformado && valorParcelaInformado > 0) {
-        // Usuário informou manualmente - validar
+        // Usuario informou manualmente - validar
         const validacao = CalculadoraFinanceira.validarSomaParcelas(
           valor_emprestimo,
           valorParcelaInformado,
@@ -90,20 +95,20 @@ export default class Parcela {
         valorParcelaBase = Math.round(valorParcelaBase * 100) / 100;
       }
 
-      // Calcular ajuste da última parcela
+      // Calcular ajuste da ultima parcela
       const ultimaParcela = CalculadoraFinanceira.ajustarUltimaParcela(
         valor_emprestimo,
         valorParcelaBase,
-        num_parcelas
+        num_parcelas,
+        juros,
+        tipo_juros as 'simples' | 'compostos'
       );
 
       // GERAR PARCELAS
       const dataBase = new Date(data_emprestimo);
 
       for (let numero = aPartirDe; numero <= num_parcelas; numero++) {
-        // Usar Utilitario para data segura
         const vencimento = adicionarMeses(dataBase, numero);
-
         const valor = (numero === num_parcelas) ? ultimaParcela : valorParcelaBase;
 
         await executor.query(
@@ -229,7 +234,8 @@ export default class Parcela {
       throw error;
     }
   }
+
   static toPublicDTO(row: any): ParcelaDTO {
-  return Parcela.toDTO(row);
-}
+    return Parcela.toDTO(row);
+  }
 }

@@ -1,6 +1,7 @@
 import type CaixaDTO from "../interface/CaixaDTO.js";
 import databaseInstance from "./DatabaseModel.js";
 import logger from "../services/Logger.js";
+import { formatarDataISO } from '../services/Utilitario.js';
 
 const database = databaseInstance.pool;
 
@@ -26,16 +27,16 @@ export default class Caixa {
             const resRecebido = await database.query(queryTotalRecebido);
             const totalRecebido = Number(resRecebido.rows[0]?.total || 0);
 
-           // 3. Total a receber (soma do que falta receber de cada emprestimo ativo)
-const queryPendente = `
-    SELECT COALESCE(SUM(
-        e.valor_emprestimo - COALESCE(
-            (SELECT SUM(valor_pago) FROM Parcela p WHERE p.id_emprestimo = e.id_emprestimo AND p.status_parcela = 'pago'), 0
-        )
-    ), 0) AS total
-    FROM Emprestimo e
-    WHERE e.status_emprestimo = TRUE
-`;
+            // 3. Total a receber (soma do que falta receber de cada emprestimo ativo)
+            const queryPendente = `
+                SELECT COALESCE(SUM(
+                    e.valor_emprestimo - COALESCE(
+                        (SELECT SUM(valor_pago) FROM Parcela p WHERE p.id_emprestimo = e.id_emprestimo AND p.status_parcela = 'pago'), 0
+                    )
+                ), 0) AS total
+                FROM Emprestimo e
+                WHERE e.status_emprestimo = TRUE
+            `;
             const resPendente = await database.query(queryPendente);
             const entradaPendente = Number(resPendente.rows[0]?.total || 0);
 
@@ -108,7 +109,7 @@ const queryPendente = `
     static async obterRelatorioDiario(data?: string): Promise<any> {
         try {
             const dataBase = data ? new Date(data) : new Date();
-            const dataStr = dataBase.toISOString().split('T')[0];
+            const dataStr = formatarDataISO(dataBase);
 
             // Parcelas pagas no dia
             const queryRecebido = `

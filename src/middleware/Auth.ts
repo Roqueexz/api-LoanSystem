@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { type Request, type Response, type NextFunction } from 'express';
 import Usuario from '../model/Usuario.js';
 import logger from '../services/Logger.js';
+import { isEmailValido, isStringValida } from '../services/Utilitario.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -21,11 +22,30 @@ export class Auth {
     static async validacaoUsuario(req: Request, res: Response): Promise<any> {
         const { email, senha } = req.body;
 
+        // Validar email e senha com Utilitario
         if (!email || !senha) {
             logger.warn({ email }, 'Tentativa de login sem email ou senha');
             return res.status(400).json({
                 auth: false,
                 message: "Email e senha sao obrigatorios."
+            });
+        }
+
+        // Validar formato do email
+        if (!isEmailValido(email)) {
+            logger.warn({ email }, 'Tentativa de login com email invalido');
+            return res.status(400).json({
+                auth: false,
+                message: "Email invalido. Por favor, insira um email valido."
+            });
+        }
+
+        // Validar tamanho minimo da senha
+        if (!isStringValida(senha) || senha.length < 6) {
+            logger.warn({ email }, 'Tentativa de login com senha muito curta');
+            return res.status(400).json({
+                auth: false,
+                message: "A senha deve ter pelo menos 6 caracteres."
             });
         }
 

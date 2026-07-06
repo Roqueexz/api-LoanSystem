@@ -1,58 +1,54 @@
+import Juros from './Juros.js';
+
 export default class CalculadoraFinanceira {
   /**
    * Calcula o valor da parcela com base no tipo de juros
-   * @param valorTotal - Valor total do empréstimo
-   * @param numParcelas - Número de parcelas
+   * @param valorTotal - Valor total do emprestimo
+   * @param numParcelas - Numero de parcelas
    * @param juros - Taxa de juros em percentual (ex: 1.5 = 1.5%)
    * @param tipoJuros - 'simples' ou 'compostos'
    * @returns Valor da parcela (sem arredondamento)
    */
   static calcularValorParcela(
-  valorTotal: number,
-  numParcelas: number,
-  juros: number,
-  tipoJuros: 'simples' | 'compostos'
-): number {
-  if (numParcelas <= 0) {
-    throw new Error('Numero de parcelas deve ser maior que zero.');
+    valorTotal: number,
+    numParcelas: number,
+    juros: number,
+    tipoJuros: 'simples' | 'compostos'
+  ): number {
+    if (numParcelas <= 0) {
+      throw new Error('Numero de parcelas deve ser maior que zero.');
+    }
+
+    if (juros === 0) {
+      return valorTotal / numParcelas;
+    }
+
+    const resultado = Juros.calcularParcelas(valorTotal, juros, numParcelas, tipoJuros);
+    return resultado.valorParcelaBase;
   }
 
-  const taxa = juros / 100;
-
-  if (juros === 0) {
-    return valorTotal / numParcelas;
-  }
-
-  if (tipoJuros === 'simples') {
-    const montante = valorTotal * (1 + taxa * numParcelas);
-    return montante / numParcelas;
-  } else {
-    const montante = valorTotal * Math.pow(1 + taxa, numParcelas);
-    return montante / numParcelas;
-  }
-}
   /**
-   * Ajusta o valor da última parcela para fechar o valor total exato
-   * @param valorTotal - Valor total do empréstimo
-   * @param valorParcelaBase - Valor base da parcela (já arredondado)
-   * @param numParcelas - Número total de parcelas
-   * @returns Valor ajustado para a última parcela
+   * Ajusta o valor da ultima parcela para fechar o valor total exato
+   * @param valorTotal - Valor total do emprestimo
+   * @param valorParcelaBase - Valor base da parcela (ja arredondado)
+   * @param numParcelas - Numero total de parcelas
+   * @param juros - Taxa de juros em percentual
+   * @param tipoJuros - 'simples' ou 'compostos'
+   * @returns Valor ajustado para a ultima parcela
    */
   static ajustarUltimaParcela(
     valorTotal: number,
     valorParcelaBase: number,
-    numParcelas: number
+    numParcelas: number,
+    juros: number,
+    tipoJuros: 'simples' | 'compostos'
   ): number {
-    const somaParcelas = valorParcelaBase * (numParcelas - 1);
-    const residual = valorTotal - somaParcelas;
-
-    // Se o residual for muito pequeno (centavos), arredonda para 2 casas
-    // Senão, mantém o valor calculado
-    return Math.round(residual * 100) / 100;
+    const resultado = Juros.calcularParcelas(valorTotal, juros, numParcelas, tipoJuros);
+    return resultado.ultimaParcela;
   }
 
   /**
-   * Verifica se a soma das parcelas está dentro da margem de erro (1 centavo)
+   * Verifica se a soma das parcelas esta dentro da margem de erro (1 centavo)
    */
   static validarSomaParcelas(
     valorTotal: number,
@@ -68,7 +64,6 @@ export default class CalculadoraFinanceira {
       return { valido: true, diferenca };
     }
 
-    // Sugere um novo valor para a parcela
     const sugestao = Math.round((somaEsperada / numParcelas) * 100) / 100;
 
     return {

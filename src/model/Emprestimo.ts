@@ -2,6 +2,7 @@ import type EmprestimoDTO from '../interface/EmprestimoDTO.js';
 import databaseInstance from './DatabaseModel.js';
 import Parcela from './Parcela.js';
 import Juros from '../services/Juros.js';
+import { isDataValida, formatarDataISO } from '../services/Utilitario.js';
 
 const database = databaseInstance.pool;
 
@@ -171,6 +172,11 @@ export default class Emprestimo {
     const client = await database.connect();
 
     try {
+      // Validar data do emprestimo
+      if (!isDataValida(emprestimo.getDataEmprestimo())) {
+        throw new Error('Data do emprestimo invalida.');
+      }
+
       await client.query('BEGIN');
 
       let valorParcelaCalculado = emprestimo.getValorParcela();
@@ -268,6 +274,11 @@ export default class Emprestimo {
     try {
       const atual = await Emprestimo.listarEmprestimo(emprestimo.getIdEmprestimo());
       if (!atual) return false;
+
+      // Validar data do emprestimo
+      if (!isDataValida(emprestimo.getDataEmprestimo())) {
+        throw new Error('Data do emprestimo invalida.');
+      }
 
       const parcelasAlteradas =
         atual.num_parcelas !== emprestimo.getNumParcelas() ||

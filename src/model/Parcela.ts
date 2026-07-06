@@ -62,13 +62,21 @@ export default class Parcela {
         throw new Error('Data do emprestimo invalida.');
       }
 
+      // Calcular montante (valor total com juros)
+      let montante = valor_emprestimo;
+      if (tipo_juros === 'simples') {
+        montante = valor_emprestimo * (1 + (juros / 100) * num_parcelas);
+      } else {
+        montante = valor_emprestimo * Math.pow(1 + juros / 100, num_parcelas);
+      }
+
       // DETERMINAR VALOR DA PARCELA
       let valorParcelaBase: number;
 
       if (valorParcelaInformado && valorParcelaInformado > 0) {
-        // Usuario informou manualmente - validar
+        // Usuario informou manualmente - validar contra o MONTANTE (com juros)
         const validacao = CalculadoraFinanceira.validarSomaParcelas(
-          valor_emprestimo,
+          montante, // <-- CORRIGIDO: usa montante em vez de valor_emprestimo
           valorParcelaInformado,
           num_parcelas,
           0.01 // margem de 1 centavo
@@ -77,7 +85,7 @@ export default class Parcela {
         if (!validacao.valido) {
           throw new Error(
             `Soma das parcelas (${(valorParcelaInformado * num_parcelas).toFixed(2)}) ` +
-            `não confere com o valor total (${valor_emprestimo.toFixed(2)}). ` +
+            `não confere com o valor total com juros (${montante.toFixed(2)}). ` +
             `Sugestão: R$ ${validacao.sugestao?.toFixed(2)} por parcela.`
           );
         }
@@ -86,7 +94,7 @@ export default class Parcela {
       } else {
         // Calcular automaticamente
         valorParcelaBase = CalculadoraFinanceira.calcularValorParcela(
-          valor_emprestimo,
+          montante, // <-- CORRIGIDO: usa montante em vez de valor_emprestimo
           num_parcelas,
           juros,
           tipo_juros as 'simples' | 'compostos'
@@ -97,7 +105,7 @@ export default class Parcela {
 
       // Calcular ajuste da ultima parcela
       const ultimaParcela = CalculadoraFinanceira.ajustarUltimaParcela(
-        valor_emprestimo,
+        montante, // <-- CORRIGIDO: usa montante em vez de valor_emprestimo
         valorParcelaBase,
         num_parcelas,
         juros,

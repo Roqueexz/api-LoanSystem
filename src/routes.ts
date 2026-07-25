@@ -11,7 +11,8 @@ import { loginLimiter } from './middleware/RateLimiter.js';
 import ClienteController from "./controller/ClienteController.js";
 import EmprestimoController from './controller/EmprestimoController.js';
 import ParcelaController from './controller/ParcelaController.js';
-import CaixaController from "./controller/CaixaController.js"; 
+import CaixaController from "./controller/CaixaController.js";
+import CaixaPessoalController from "./controller/CaixaPessoalController.js";
 import { AuthController } from "./controller/AuthController.js";
 
 // Importação dos Schemas e Validation
@@ -37,10 +38,9 @@ router.post('/api/login', loginLimiter, validate(LoginSchema), authController.lo
 // ROTAS DE CLIENTES (TODAS PROTEGIDAS)
 // ============================================
 router.post('/api/clientes', Auth.verifyToken, validate(ClienteSchema), ClienteController.cadastrar);
-router.put('/api/clientes/:id', Auth.verifyToken, validate(ClienteSchema), ClienteController.atualizar); 
+router.put('/api/clientes/:id', Auth.verifyToken, validate(ClienteSchema), ClienteController.atualizar);
 router.delete('/api/clientes/:id', Auth.verifyToken, ClienteController.remover);
 router.get('/api/clientes', Auth.verifyToken, ClienteController.todos);
-
 router.get('/api/clientes/:id/resumo', Auth.verifyToken, ClienteController.resumo);
 router.get('/api/clientes/:id', Auth.verifyToken, ClienteController.cliente);
 
@@ -62,14 +62,18 @@ router.patch('/api/parcelas/:id/pagar', Auth.verifyToken, ParcelaController.paga
 router.patch('/api/parcelas/:id/desfazer', Auth.verifyToken, ParcelaController.desfazer);
 
 // ============================================
-// ROTAS DO CAIXA (BALANÇO FINANCEIRO - PROTEGIDA)
+// ROTAS DO CAIXA FINANCEIRO (PROTEGIDAS)
 // ============================================
-router.get('/api/caixa', Auth.verifyToken, CaixaController.resumo); 
-// ============================================
-// ROTAS DE RELATÓRIOS (PROTEGIDAS)
-// ============================================
+router.get('/api/caixa', Auth.verifyToken, CaixaController.resumo);
 router.get('/api/caixa/diario', Auth.verifyToken, CaixaController.relatorioDiario);
 router.get('/api/caixa/mensal', Auth.verifyToken, CaixaController.relatorioMensal);
 router.get('/api/caixa/anual', Auth.verifyToken, CaixaController.relatorioAnual);
+
+// ============================================
+// ROTAS DO CAIXA PESSOAL (PROTEGIDAS)
+// Isolamento por usuário: id vem do token JWT.
+// ============================================
+router.get('/api/caixa-pessoal/cofre', Auth.verifyToken, CaixaPessoalController.obterCofre);
+router.patch('/api/caixa-pessoal/cofre/:valor_cedula', Auth.verifyToken, CaixaPessoalController.atualizarCedula);
 
 export { router };

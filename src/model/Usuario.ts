@@ -151,7 +151,26 @@ export default class Usuario {
 
       const senhaValida = await bcrypt.compare(senhaPlain, usuario.senha);
 
+      // Se a comparação falhar, pode ser que a senha esteja armazenada em texto puro
+      // (legado). Em caso de igualdade direta, re-hash e atualize o registro no DB.
       if (!senhaValida) {
+        // Upgrade de senha legada: se a senha armazenada coincidir com a senha em texto,
+        // hash-e e persista no banco para futuras comparações.
+        if (usuario.senha === senhaPlain) {
+          try {
+            const saltRounds = 10;
+            const novaHash = await bcrypt.hash(senhaPlain, saltRounds);
+            const queryUpdate = `UPDATE usuario SET senha = $1 WHERE id_usuario = $2`;
+            await database.query(queryUpdate, [novaHash, usuario.id_usuario]);
+            // atualiza objeto retornado para refletir hash (não expor senha depois)
+            usuario.senha = novaHash;
+            return usuario;
+          } catch (err) {
+            console.error('[UsuarioModel] Erro ao atualizar senha legado:', err);
+            return null;
+          }
+        }
+
         return null;
       }
 

@@ -110,13 +110,14 @@ export default class CaixaPessoalController {
                 });
             }
 
-            const novaMovimentacao = await CaixaPessoal.criarMovimentacao(Number(id), {
+            const payload = {
                 tipo,
                 valor: valorNum,
                 categoria: categoria.trim(),
-                descricao: descricao ? String(descricao).trim() : undefined,
-                data: data ? String(data) : new Date().toISOString().split('T')[0],
-            });
+                ...(descricao !== undefined && descricao !== null ? { descricao: String(descricao).trim() } : {}),
+                data: String(data ?? new Date().toISOString().split('T')[0]),
+            };
+            const novaMovimentacao = await CaixaPessoal.criarMovimentacao(Number(id), payload);
 
             return res.status(201).json(novaMovimentacao);
         } catch (error) {

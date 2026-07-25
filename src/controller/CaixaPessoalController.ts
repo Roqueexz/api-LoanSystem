@@ -158,4 +158,95 @@ export default class CaixaPessoalController {
             });
         }
     }
+
+    // ─── GET /api/caixa-pessoal/contas ─────────────────────────────────
+    static async listarContas(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            const contas = await CaixaPessoal.listarContas(Number(id));
+            return res.status(200).json(contas);
+        } catch (error) {
+            logger.error({ error }, '[CaixaPessoalController] Erro ao listar contas');
+            return res.status(500).json({ mensagem: 'Erro interno ao listar contas.' });
+        }
+    }
+
+    // ─── POST /api/caixa-pessoal/contas ────────────────────────────────
+    static async criarConta(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            const { tipo, descricao, valor, vencimento } = req.body;
+
+            if (!tipo || !['pagar', 'receber'].includes(tipo)) {
+                return res.status(400).json({ mensagem: 'Campo "tipo" deve ser "pagar" ou "receber".' });
+            }
+
+            if (!descricao || typeof descricao !== 'string' || descricao.trim() === '') {
+                return res.status(400).json({ mensagem: 'Campo "descricao" é obrigatório.' });
+            }
+
+            const valorNum = Number(valor);
+            if (isNaN(valorNum) || valorNum <= 0) {
+                return res.status(400).json({ mensagem: 'Campo "valor" deve ser um número positivo.' });
+            }
+
+            // vencimento no formato YYYY-MM-DD (ou omitido será validado no model)
+            const payload = {
+                tipo,
+                descricao: descricao.trim(),
+                valor: valorNum,
+                vencimento: String(vencimento),
+            };
+
+            const novaConta = await CaixaPessoal.criarConta(Number(id), payload);
+            return res.status(201).json(novaConta);
+        } catch (error) {
+            logger.error({ error }, '[CaixaPessoalController] Erro ao criar conta');
+            return res.status(500).json({ mensagem: 'Erro interno ao criar conta.' });
+        }
+    }
+
+    // ─── PATCH /api/caixa-pessoal/contas/:id/pagar ─────────────────────
+    static async pagarConta(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            const id_conta = Number(req.params.id);
+
+            if (isNaN(id_conta) || id_conta <= 0) {
+                return res.status(400).json({ mensagem: 'ID da conta inválido.' });
+            }
+
+            const atualizado = await CaixaPessoal.pagarConta(Number(id), id_conta);
+            if (!atualizado) {
+                return res.status(404).json({ mensagem: 'Conta não encontrada ou não pertence ao usuário.' });
+            }
+
+            return res.status(200).json({ mensagem: 'Conta marcada como paga.' });
+        } catch (error) {
+            logger.error({ error }, '[CaixaPessoalController] Erro ao marcar conta como paga');
+            return res.status(500).json({ mensagem: 'Erro interno ao pagar conta.' });
+        }
+    }
+
+    // ─── DELETE /api/caixa-pessoal/contas/:id ──────────────────────────
+    static async removerConta(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            const id_conta = Number(req.params.id);
+
+            if (isNaN(id_conta) || id_conta <= 0) {
+                return res.status(400).json({ mensagem: 'ID da conta inválido.' });
+            }
+
+            const deletado = await CaixaPessoal.removerConta(Number(id), id_conta);
+            if (!deletado) {
+                return res.status(404).json({ mensagem: 'Conta não encontrada ou não pertence ao usuário.' });
+            }
+
+            return res.status(200).json({ mensagem: 'Conta removida com sucesso.' });
+        } catch (error) {
+            logger.error({ error }, '[CaixaPessoalController] Erro ao remover conta');
+            return res.status(500).json({ mensagem: 'Erro interno ao remover conta.' });
+        }
+    }
 }

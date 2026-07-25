@@ -1,13 +1,10 @@
+// api/src/routes.ts
 import { Router } from "express";
 import type { Request, Response } from "express";
 
-// Importação do middleware de Autenticação
 import { Auth } from "./middleware/Auth.js";
-
-// Importação do Rate Limiter
 import { loginLimiter } from './middleware/RateLimiter.js';
 
-// Importação dos Controllers
 import ClienteController from "./controller/ClienteController.js";
 import EmprestimoController from './controller/EmprestimoController.js';
 import ParcelaController from './controller/ParcelaController.js';
@@ -15,7 +12,6 @@ import CaixaController from "./controller/CaixaController.js";
 import CaixaPessoalController from "./controller/CaixaPessoalController.js";
 import { AuthController } from "./controller/AuthController.js";
 
-// Importação dos Schemas e Validation
 import { validate } from "./middleware/Validation.js";
 import { ClienteSchema } from "./schemas/ClienteSchema.js";
 import { EmprestimoSchema } from "./schemas/EmprestimoSchema.js";
@@ -31,11 +27,10 @@ router.get("/api", (req: Request, res: Response) => {
   res.status(200).json({ mensagem: "Olá, boas-vindas a API do LoanSystem." });
 });
 
-// 🔓 Rota Pública: Realizar login e obter o token JWT
 router.post('/api/login', loginLimiter, validate(LoginSchema), authController.login);
 
 // ============================================
-// ROTAS DE CLIENTES (TODAS PROTEGIDAS)
+// ROTAS DE CLIENTES
 // ============================================
 router.post('/api/clientes', Auth.verifyToken, validate(ClienteSchema), ClienteController.cadastrar);
 router.put('/api/clientes/:id', Auth.verifyToken, validate(ClienteSchema), ClienteController.atualizar);
@@ -45,7 +40,7 @@ router.get('/api/clientes/:id/resumo', Auth.verifyToken, ClienteController.resum
 router.get('/api/clientes/:id', Auth.verifyToken, ClienteController.cliente);
 
 // ============================================
-// ROTAS DE EMPRESTIMOS (TODAS PROTEGIDAS)
+// ROTAS DE EMPRESTIMOS
 // ============================================
 router.post('/api/emprestimos', Auth.verifyToken, validate(EmprestimoSchema), EmprestimoController.cadastrar);
 router.put('/api/emprestimos/:id', Auth.verifyToken, validate(EmprestimoSchema), EmprestimoController.atualizar);
@@ -54,7 +49,7 @@ router.get('/api/emprestimos', Auth.verifyToken, EmprestimoController.todos);
 router.get('/api/emprestimos/:id', Auth.verifyToken, EmprestimoController.emprestimo);
 
 // ============================================
-// ROTAS DE PARCELAS (TODAS PROTEGIDAS)
+// ROTAS DE PARCELAS
 // ============================================
 router.get('/api/emprestimos/:id/parcelas', Auth.verifyToken, ParcelaController.porEmprestimo);
 router.get('/api/parcelas/:id', Auth.verifyToken, ParcelaController.parcela);
@@ -62,7 +57,7 @@ router.patch('/api/parcelas/:id/pagar', Auth.verifyToken, ParcelaController.paga
 router.patch('/api/parcelas/:id/desfazer', Auth.verifyToken, ParcelaController.desfazer);
 
 // ============================================
-// ROTAS DO CAIXA FINANCEIRO (PROTEGIDAS)
+// ROTAS DO CAIXA FINANCEIRO
 // ============================================
 router.get('/api/caixa', Auth.verifyToken, CaixaController.resumo);
 router.get('/api/caixa/diario', Auth.verifyToken, CaixaController.relatorioDiario);
@@ -70,10 +65,14 @@ router.get('/api/caixa/mensal', Auth.verifyToken, CaixaController.relatorioMensa
 router.get('/api/caixa/anual', Auth.verifyToken, CaixaController.relatorioAnual);
 
 // ============================================
-// ROTAS DO CAIXA PESSOAL (PROTEGIDAS)
-// Isolamento por usuário: id vem do token JWT.
+// ROTAS DO CAIXA PESSOAL
 // ============================================
 router.get('/api/caixa-pessoal/cofre', Auth.verifyToken, CaixaPessoalController.obterCofre);
 router.patch('/api/caixa-pessoal/cofre/:valor_cedula', Auth.verifyToken, CaixaPessoalController.atualizarCedula);
+
+// Sprint 3: Movimentações
+router.get('/api/caixa-pessoal/movimentacoes', Auth.verifyToken, CaixaPessoalController.listarMovimentacoes);
+router.post('/api/caixa-pessoal/movimentacoes', Auth.verifyToken, CaixaPessoalController.criarMovimentacao);
+router.delete('/api/caixa-pessoal/movimentacoes/:id', Auth.verifyToken, CaixaPessoalController.removerMovimentacao);
 
 export { router };

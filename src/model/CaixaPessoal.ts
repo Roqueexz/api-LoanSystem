@@ -1,4 +1,9 @@
-import type { CofreFisicoDTO, CedulaCofreDTO } from '../interface/CaixaPessoalDTO.js';
+// api/src/model/CaixaPessoal.ts
+import type { 
+  CofreFisicoDTO, 
+  CedulaCofreDTO, 
+  MovimentacaoDTO 
+} from '../interface/CaixaPessoalDTO.js';
 import databaseInstance from './DatabaseModel.js';
 import logger from '../services/Logger.js';
 
@@ -10,9 +15,6 @@ const CEDULAS_VALIDAS = [200, 100, 50, 20, 10, 5, 2];
 export default class CaixaPessoal {
 
     // ─── COFRE: OBTER ──────────────────────────────────────────────────
-    // Retorna todas as cédulas do usuário, ordenadas da maior para menor.
-    // Cédulas sem registro no banco são retornadas com quantidade 0,
-    // garantindo que o frontend sempre receba as 7 cédulas.
     static async obterCofre(id_usuario: number): Promise<CofreFisicoDTO> {
         try {
             const query = `
@@ -23,12 +25,10 @@ export default class CaixaPessoal {
             `;
             const resultado = await database.query(query, [id_usuario]);
 
-            // Mapeia os registros existentes
             const registros = new Map<number, number>(
                 resultado.rows.map((r: any) => [Number(r.valor_cedula), Number(r.quantidade)])
             );
 
-            // Garante que todas as 7 cédulas aparecem, mesmo sem registro
             const cedulas: CedulaCofreDTO[] = CEDULAS_VALIDAS.map((valor) => ({
                 valor_cedula: valor,
                 quantidade: registros.get(valor) ?? 0,
@@ -50,16 +50,11 @@ export default class CaixaPessoal {
     }
 
     // ─── COFRE: ATUALIZAR CÉDULA ───────────────────────────────────────
-    // UPSERT: insere se não existir, atualiza se já existir.
-    // Segurança: valida que a cédula é um valor permitido.
-    // Segurança: valida que a quantidade não é negativa.
-    // Segurança: id_usuario vem sempre do token JWT, nunca do body.
     static async atualizarCedula(
         id_usuario: number,
         valor_cedula: number,
         quantidade: number
     ): Promise<CedulaCofreDTO> {
-        // Validação de cédula válida — camada de segurança extra no model
         if (!CEDULAS_VALIDAS.includes(valor_cedula)) {
             throw new Error(`Cédula inválida: ${valor_cedula}`);
         }
@@ -100,6 +95,130 @@ export default class CaixaPessoal {
             logger.error(
                 { error, id_usuario, valor_cedula, quantidade },
                 '[CaixaPessoal] Erro ao atualizar cédula'
+            );
+            throw error;
+        }
+    }
+
+    // ─── MOVIMENTAÇÕES: LISTAR ─────────────────────────────────────────
+    static async listarMovimentacoes(
+        id_usuario: number,
+        filtros?: { tipo?: string; categoria?: string }
+    ): Promise<MovimentacaoDTO[]> {
+        try {
+            let query = `
+                SELECT id_movimentacao, tipo, valor, categoria, descricao, 
+                       TO_CHAR(data, 'YYYY-MM-DD') as data, criado_em
+                FROM caixa_pessoal_movimentacao
+                WHERE id_usuario = $1
+            `;
+            const params: any[] = [id_usuario];
+
+            if (filtros?.tipo) {
+                params.push(filtros.tipo);
+                query += ` AND tipo = $${params.length}`;
+            }
+
+            if (filtros?.categoria) {
+                params.push(`%${filtros.categoria}%`);
+                query += ` AND categoria ILIKE $${params.length}`;
+            }
+
+            query += ` ORDER BY data DESC, criado_em DESC`;
+
+            const resultado = await database.query(query, params);
+
+            return resultado.rows.map((row: any) => ({
+                id_movimentacao: row.id_movimentacao,
+                tipo: row.tipo,
+                valor: Number(row.valor),
+                categoria: row.categoria,
+                descricao: row.descricao,
+                data: row.data,
+            }));
+        } catch (error) {
+            logger.error({ error, id_usuario }, '[CaixaPessoal] Erro ao listar movimentações');
+            throw error;
+        }
+    }
+
+    // ─── MOVIMENTAÇÕES: CRIAR ──────────────────────────────────────────
+    static async criarMovimentacao(
+        id_usuario: number,
+        dados: Omit<MovimentacaoDTO, 'id_movimentacao'>
+    ): Promise<MovimentacaoDTO> {
+        const { tipo, valor, categoria, descricao, data } = dados;
+
+        if (!['entrada', 'saida'].includes(tipo)) {
+            throw new Error('Tipo de movimentação inválido.');
+        }
+
+        if (valor <= 0) {
+            throw new Error('Valor da movimentação deve ser maior que zero.');
+        }
+
+        try {
+            const query = `
+                INSERT INTO caixa_pessoal_movimentacao 
+                    (id_usuario, tipo, valor, categoria, descricao, data)
+                VALUES ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE))
+                RETURNING id_movimentacao, tipo, valor, categoria, descricao, 
+                          TO_CHAR(data, 'YYYY-MM-DD') as data
+            `;
+            const resultado = await database.query(query, [
+                id_usuario,
+                tipo,
+                valor,
+                categoria,
+                descricao || null,
+                data || null,
+            ]);
+
+            const row = resultado.rows[0];
+
+            logger.info(
+                { id_usuario, id_movimentacao: row.id_movimentacao },
+                '[CaixaPessoal] Movimentação registrada'
+            );
+
+            return {
+                id_movimentacao: row.id_movimentacao,
+                tipo: row.tipo,
+                valor: Number(row.valor),
+                categoria: row.categoria,
+                descricao: row.descricao,
+                data: row.data,
+            };
+        } catch (error) {
+            logger.error({ error, id_usuario, dados }, '[CaixaPessoal] Erro ao criar movimentação');
+            throw error;
+        }
+    }
+
+    // ─── MOVIMENTAÇÕES: REMOVER ────────────────────────────────────────
+    static async removerMovimentacao(
+        id_usuario: number,
+        id_movimentacao: number
+    ): Promise<boolean> {
+        try {
+            const query = `
+                DELETE FROM caixa_pessoal_movimentacao
+                WHERE id_movimentacao = $1 AND id_usuario = $2
+                RETURNING id_movimentacao
+            `;
+            const resultado = await database.query(query, [id_movimentacao, id_usuario]);
+
+            const deletado = (resultado.rowCount ?? 0) > 0;
+
+            if (deletado) {
+                logger.info({ id_usuario, id_movimentacao }, '[CaixaPessoal] Movimentação removida');
+            }
+
+            return deletado;
+        } catch (error) {
+            logger.error(
+                { error, id_usuario, id_movimentacao },
+                '[CaixaPessoal] Erro ao remover movimentação'
             );
             throw error;
         }

@@ -1,15 +1,15 @@
 -- ============================================
 -- DROP TABLES (A ordem importa devido às chaves estrangeiras)
+-- Caixa Pessoal deve ser dropado antes de usuario
 -- ============================================
-DROP TABLE IF EXISTS Parcela CASCADE;
-DROP TABLE IF EXISTS Emprestimo CASCADE;
-DROP TABLE IF EXISTS Cliente CASCADE;
-DROP TABLE IF EXISTS usuario CASCADE;
 DROP TABLE IF EXISTS caixa_pessoal_meta CASCADE;
 DROP TABLE IF EXISTS caixa_pessoal_conta CASCADE;
 DROP TABLE IF EXISTS caixa_pessoal_movimentacao CASCADE;
 DROP TABLE IF EXISTS caixa_pessoal_cofre CASCADE;
--- ... drops existentes permanecem iguais
+DROP TABLE IF EXISTS Parcela CASCADE;
+DROP TABLE IF EXISTS Emprestimo CASCADE;
+DROP TABLE IF EXISTS Cliente CASCADE;
+DROP TABLE IF EXISTS usuario CASCADE;
 
 -- ============================================
 -- TABELA CLIENTE
@@ -81,20 +81,24 @@ CREATE TABLE IF NOT EXISTS usuario (
     id_usuario SERIAL PRIMARY KEY,
     nome VARCHAR(80) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
-    senha VARCHAR(255) NOT NULL,  -- <-- AUMENTADO DE 100 PARA 255
+    senha VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL DEFAULT 'admin',
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================
 -- TABELA CAIXA PESSOAL — COFRE FÍSICO
--- Sprint 2: controle de cédulas físicas
+-- Sprint 2: controle de cédulas por usuário
+-- UNIQUE(id_usuario, valor_cedula) garante
+-- uma linha por cédula por usuário.
+-- UPSERT é usado na atualização.
 -- ============================================
 CREATE TABLE IF NOT EXISTS caixa_pessoal_cofre (
     id_cofre        SERIAL PRIMARY KEY,
     id_usuario      INT NOT NULL,
-    valor_cedula    NUMERIC(6,2) NOT NULL,  -- 2, 5, 10, 20, 50, 100, 200
-    quantidade      INT NOT NULL DEFAULT 0,
+    valor_cedula    NUMERIC(6,2) NOT NULL,   -- 2, 5, 10, 20, 50, 100, 200
+    quantidade      INT NOT NULL DEFAULT 0
+                        CHECK (quantidade >= 0), -- nunca negativo
     atualizado_em   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_cofre_usuario
@@ -103,8 +107,11 @@ CREATE TABLE IF NOT EXISTS caixa_pessoal_cofre (
         ON DELETE CASCADE,
 
     CONSTRAINT uq_cofre_cedula
-        UNIQUE (id_usuario, valor_cedula)    -- 1 linha por cédula por usuário
+        UNIQUE (id_usuario, valor_cedula)
 );
+
+CREATE INDEX IF NOT EXISTS idx_cofre_usuario
+    ON caixa_pessoal_cofre(id_usuario);
 
 -- ============================================
 -- TABELA CAIXA PESSOAL — MOVIMENTAÇÕES
@@ -115,7 +122,8 @@ CREATE TABLE IF NOT EXISTS caixa_pessoal_movimentacao (
     id_usuario      INT NOT NULL,
     tipo            VARCHAR(10) NOT NULL
                         CHECK (tipo IN ('entrada', 'saida')),
-    valor           NUMERIC(10,2) NOT NULL,
+    valor           NUMERIC(10,2) NOT NULL
+                        CHECK (valor > 0),
     categoria       VARCHAR(60) NOT NULL,
     descricao       VARCHAR(255),
     data            DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -129,7 +137,6 @@ CREATE TABLE IF NOT EXISTS caixa_pessoal_movimentacao (
 
 CREATE INDEX IF NOT EXISTS idx_movimentacao_usuario
     ON caixa_pessoal_movimentacao(id_usuario);
-
 CREATE INDEX IF NOT EXISTS idx_movimentacao_data
     ON caixa_pessoal_movimentacao(data);
 
@@ -143,7 +150,8 @@ CREATE TABLE IF NOT EXISTS caixa_pessoal_conta (
     tipo            VARCHAR(10) NOT NULL
                         CHECK (tipo IN ('pagar', 'receber')),
     descricao       VARCHAR(255) NOT NULL,
-    valor           NUMERIC(10,2) NOT NULL,
+    valor           NUMERIC(10,2) NOT NULL
+                        CHECK (valor > 0),
     vencimento      DATE NOT NULL,
     pago            BOOLEAN NOT NULL DEFAULT FALSE,
     criado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -156,7 +164,6 @@ CREATE TABLE IF NOT EXISTS caixa_pessoal_conta (
 
 CREATE INDEX IF NOT EXISTS idx_conta_usuario
     ON caixa_pessoal_conta(id_usuario);
-
 CREATE INDEX IF NOT EXISTS idx_conta_vencimento
     ON caixa_pessoal_conta(vencimento);
 
@@ -169,8 +176,10 @@ CREATE TABLE IF NOT EXISTS caixa_pessoal_meta (
     id_usuario      INT NOT NULL,
     nome            VARCHAR(120) NOT NULL,
     descricao       VARCHAR(255),
-    valor_alvo      NUMERIC(10,2) NOT NULL,
-    valor_atual     NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    valor_alvo      NUMERIC(10,2) NOT NULL
+                        CHECK (valor_alvo > 0),
+    valor_atual     NUMERIC(10,2) NOT NULL DEFAULT 0.00
+                        CHECK (valor_atual >= 0),
     prazo           DATE,
     criado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -179,6 +188,9 @@ CREATE TABLE IF NOT EXISTS caixa_pessoal_meta (
         REFERENCES usuario(id_usuario)
         ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_meta_usuario
+    ON caixa_pessoal_meta(id_usuario);
 
 -- ============================================
 -- INSERTS DE TESTE: CLIENTES
@@ -201,20 +213,17 @@ INSERT INTO Emprestimo (id_cliente, valor_emprestimo, num_parcelas, valor_parcel
 -- ============================================
 -- INSERTS DE TESTE: PARCELAS
 -- ============================================
--- Parcelas do Carlos (Empréstimo 1) - Pagou 2, tem 1 vencida e o resto pendente
 INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, data_vencimento, data_pagamento, status_parcela) VALUES
 (1, 1, 458.33, 458.33, '2026-02-15', '2026-02-14', 'pago'),
 (1, 2, 458.33, 458.33, '2026-03-15', '2026-03-15', 'pago'),
 (1, 3, 458.33, 0.00, '2026-04-15', NULL, 'pendente'),
 (1, 4, 458.33, 0.00, '2026-05-15', NULL, 'pendente');
 
--- Parcelas da Ana (Empréstimo 2) - Pagou 1, o resto pendente
 INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, data_vencimento, data_pagamento, status_parcela) VALUES
 (2, 1, 520.83, 520.83, '2026-04-10', '2026-04-10', 'pago'),
 (2, 2, 520.83, 0.00, '2026-05-10', NULL, 'pendente'),
 (2, 3, 520.83, 0.00, '2026-06-10', NULL, 'pendente');
 
--- Parcelas da Mariana (Empréstimo 3) - Tudo pago
 INSERT INTO Parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, data_vencimento, data_pagamento, status_parcela) VALUES
 (3, 1, 350.00, 350.00, '2025-07-01', '2025-07-01', 'pago'),
 (3, 2, 350.00, 350.00, '2025-08-01', '2025-08-02', 'pago'),

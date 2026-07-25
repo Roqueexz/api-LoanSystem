@@ -2,7 +2,8 @@
 import type { 
   CofreFisicoDTO, 
   CedulaCofreDTO, 
-  MovimentacaoDTO 
+  MovimentacaoDTO,
+  ContaDTO
 } from '../interface/CaixaPessoalDTO.js';
 import databaseInstance from './DatabaseModel.js';
 import logger from '../services/Logger.js';
@@ -220,6 +221,137 @@ export default class CaixaPessoal {
                 { error, id_usuario, id_movimentacao },
                 '[CaixaPessoal] Erro ao remover movimentação'
             );
+            throw error;
+        }
+    }
+
+    // ─── CONTAS: LISTAR ───────────────────────────────────────────────
+    static async listarContas(
+        id_usuario: number
+    ): Promise<ContaDTO[]> {
+        try {
+            const query = `
+                SELECT id_conta, tipo, descricao, valor, vencimento, pago, criado_em
+                FROM caixa_pessoal_conta
+                WHERE id_usuario = $1
+                ORDER BY vencimento ASC, criado_em DESC
+            `;
+            const resultado = await database.query(query, [id_usuario]);
+
+            return resultado.rows.map((row: any) => ({
+                id_conta: row.id_conta,
+                tipo: row.tipo,
+                descricao: row.descricao,
+                valor: Number(row.valor),
+                vencimento: row.vencimento instanceof Date ? row.vencimento.toISOString().split('T')[0] : row.vencimento,
+                pago: Boolean(row.pago),
+            }));
+        } catch (error) {
+            logger.error({ error, id_usuario }, '[CaixaPessoal] Erro ao listar contas');
+            throw error;
+        }
+    }
+
+    // ─── CONTAS: CRIAR ────────────────────────────────────────────────
+    static async criarConta(
+        id_usuario: number,
+        dados: { tipo: 'pagar' | 'receber'; descricao: string; valor: number; vencimento: string; pago?: boolean }
+    ): Promise<ContaDTO> {
+        const { tipo, descricao, valor, vencimento } = dados;
+
+        if (!['pagar', 'receber'].includes(tipo)) {
+            throw new Error('Tipo de conta inválido.');
+        }
+
+        if (!descricao || String(descricao).trim() === '') {
+            throw new Error('Descrição é obrigatória.');
+        }
+
+        if (valor <= 0) {
+            throw new Error('Valor da conta deve ser maior que zero.');
+        }
+
+        try {
+            const query = `
+                INSERT INTO caixa_pessoal_conta (id_usuario, tipo, descricao, valor, vencimento)
+                VALUES ($1, $2, $3, $4, $5::date)
+                RETURNING id_conta, tipo, descricao, valor, TO_CHAR(vencimento, 'YYYY-MM-DD') as vencimento, pago
+            `;
+            const resultado = await database.query(query, [
+                id_usuario,
+                tipo,
+                descricao,
+                valor,
+                vencimento,
+            ]);
+
+            const row = resultado.rows[0];
+
+            logger.info({ id_usuario, id_conta: row.id_conta }, '[CaixaPessoal] Conta criada');
+
+            return {
+                id_conta: row.id_conta,
+                tipo: row.tipo,
+                descricao: row.descricao,
+                valor: Number(row.valor),
+                vencimento: row.vencimento,
+                pago: Boolean(row.pago),
+            };
+        } catch (error) {
+            logger.error({ error, id_usuario, dados }, '[CaixaPessoal] Erro ao criar conta');
+            throw error;
+        }
+    }
+
+    // ─── CONTAS: PAGAR ────────────────────────────────────────────────
+    static async pagarConta(
+        id_usuario: number,
+        id_conta: number
+    ): Promise<boolean> {
+        try {
+            const query = `
+                UPDATE caixa_pessoal_conta
+                SET pago = TRUE
+                WHERE id_conta = $1 AND id_usuario = $2
+                RETURNING id_conta
+            `;
+            const resultado = await database.query(query, [id_conta, id_usuario]);
+
+            const atualizado = (resultado.rowCount ?? 0) > 0;
+
+            if (atualizado) {
+                logger.info({ id_usuario, id_conta }, '[CaixaPessoal] Conta marcada como paga');
+            }
+
+            return atualizado;
+        } catch (error) {
+            logger.error({ error, id_usuario, id_conta }, '[CaixaPessoal] Erro ao pagar conta');
+            throw error;
+        }
+    }
+
+    // ─── CONTAS: REMOVER ─────────────────────────────────────────────
+    static async removerConta(
+        id_usuario: number,
+        id_conta: number
+    ): Promise<boolean> {
+        try {
+            const query = `
+                DELETE FROM caixa_pessoal_conta
+                WHERE id_conta = $1 AND id_usuario = $2
+                RETURNING id_conta
+            `;
+            const resultado = await database.query(query, [id_conta, id_usuario]);
+
+            const deletado = (resultado.rowCount ?? 0) > 0;
+
+            if (deletado) {
+                logger.info({ id_usuario, id_conta }, '[CaixaPessoal] Conta removida');
+            }
+
+            return deletado;
+        } catch (error) {
+            logger.error({ error, id_usuario, id_conta }, '[CaixaPessoal] Erro ao remover conta');
             throw error;
         }
     }

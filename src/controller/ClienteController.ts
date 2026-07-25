@@ -58,6 +58,9 @@ export default class ClienteController {
 
   static async cadastrar(req: Request, res: Response) {
     try {
+          console.log('[ClienteController] Requisicao recebida em /api/clientes');
+          console.log('[ClienteController] Body:', req.body);
+          console.log('[ClienteController] Headers:', req.headers);
       const dadosRecebidos = req.body;
 
       const novoCliente = new Cliente(

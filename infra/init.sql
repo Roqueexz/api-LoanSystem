@@ -5,6 +5,11 @@ DROP TABLE IF EXISTS Parcela CASCADE;
 DROP TABLE IF EXISTS Emprestimo CASCADE;
 DROP TABLE IF EXISTS Cliente CASCADE;
 DROP TABLE IF EXISTS usuario CASCADE;
+DROP TABLE IF EXISTS caixa_pessoal_meta CASCADE;
+DROP TABLE IF EXISTS caixa_pessoal_conta CASCADE;
+DROP TABLE IF EXISTS caixa_pessoal_movimentacao CASCADE;
+DROP TABLE IF EXISTS caixa_pessoal_cofre CASCADE;
+-- ... drops existentes permanecem iguais
 
 -- ============================================
 -- TABELA CLIENTE
@@ -79,6 +84,100 @@ CREATE TABLE IF NOT EXISTS usuario (
     senha VARCHAR(255) NOT NULL,  -- <-- AUMENTADO DE 100 PARA 255
     role VARCHAR(20) NOT NULL DEFAULT 'admin',
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- TABELA CAIXA PESSOAL — COFRE FÍSICO
+-- Sprint 2: controle de cédulas físicas
+-- ============================================
+CREATE TABLE IF NOT EXISTS caixa_pessoal_cofre (
+    id_cofre        SERIAL PRIMARY KEY,
+    id_usuario      INT NOT NULL,
+    valor_cedula    NUMERIC(6,2) NOT NULL,  -- 2, 5, 10, 20, 50, 100, 200
+    quantidade      INT NOT NULL DEFAULT 0,
+    atualizado_em   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_cofre_usuario
+        FOREIGN KEY (id_usuario)
+        REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_cofre_cedula
+        UNIQUE (id_usuario, valor_cedula)    -- 1 linha por cédula por usuário
+);
+
+-- ============================================
+-- TABELA CAIXA PESSOAL — MOVIMENTAÇÕES
+-- Sprint 3: entradas e saídas com categoria
+-- ============================================
+CREATE TABLE IF NOT EXISTS caixa_pessoal_movimentacao (
+    id_movimentacao SERIAL PRIMARY KEY,
+    id_usuario      INT NOT NULL,
+    tipo            VARCHAR(10) NOT NULL
+                        CHECK (tipo IN ('entrada', 'saida')),
+    valor           NUMERIC(10,2) NOT NULL,
+    categoria       VARCHAR(60) NOT NULL,
+    descricao       VARCHAR(255),
+    data            DATE NOT NULL DEFAULT CURRENT_DATE,
+    criado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_movimentacao_usuario
+        FOREIGN KEY (id_usuario)
+        REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_movimentacao_usuario
+    ON caixa_pessoal_movimentacao(id_usuario);
+
+CREATE INDEX IF NOT EXISTS idx_movimentacao_data
+    ON caixa_pessoal_movimentacao(data);
+
+-- ============================================
+-- TABELA CAIXA PESSOAL — CONTAS
+-- Sprint 4: contas a pagar e a receber
+-- ============================================
+CREATE TABLE IF NOT EXISTS caixa_pessoal_conta (
+    id_conta        SERIAL PRIMARY KEY,
+    id_usuario      INT NOT NULL,
+    tipo            VARCHAR(10) NOT NULL
+                        CHECK (tipo IN ('pagar', 'receber')),
+    descricao       VARCHAR(255) NOT NULL,
+    valor           NUMERIC(10,2) NOT NULL,
+    vencimento      DATE NOT NULL,
+    pago            BOOLEAN NOT NULL DEFAULT FALSE,
+    criado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_conta_usuario
+        FOREIGN KEY (id_usuario)
+        REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_conta_usuario
+    ON caixa_pessoal_conta(id_usuario);
+
+CREATE INDEX IF NOT EXISTS idx_conta_vencimento
+    ON caixa_pessoal_conta(vencimento);
+
+-- ============================================
+-- TABELA CAIXA PESSOAL — METAS FINANCEIRAS
+-- Sprint 5: metas com progresso e prazo
+-- ============================================
+CREATE TABLE IF NOT EXISTS caixa_pessoal_meta (
+    id_meta         SERIAL PRIMARY KEY,
+    id_usuario      INT NOT NULL,
+    nome            VARCHAR(120) NOT NULL,
+    descricao       VARCHAR(255),
+    valor_alvo      NUMERIC(10,2) NOT NULL,
+    valor_atual     NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    prazo           DATE,
+    criado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_meta_usuario
+        FOREIGN KEY (id_usuario)
+        REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE
 );
 
 -- ============================================

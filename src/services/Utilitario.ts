@@ -138,6 +138,26 @@ export function limparTelefone(telefone: string): string {
   return telefone.replace(/\D/g, '');
 }
 
+/**
+ * Valida se o telefone tem o formato correto (10 ou 11 digitos, com DDD)
+ * Ex: (11) 99999-9999 ou (11) 9999-9999
+ */
+export function isTelefoneValido(telefone: string): boolean {
+  const limpo = telefone.replace(/\D/g, '');
+  // 10 digitos: (XX) XXXX-XXXX
+  // 11 digitos: (XX) 9XXXX-XXXX
+  return limpo.length === 10 || limpo.length === 11;
+}
+
+/**
+ * Extrai o DDD do telefone
+ */
+export function extrairDDD(telefone: string): string | null {
+  const limpo = telefone.replace(/\D/g, '');
+  if (limpo.length < 10) return null;
+  return limpo.slice(0, 2);
+}
+
 // ============================================
 // TEXTO
 // ============================================

@@ -1,0 +1,51 @@
+// ============================================================
+// CaixaPessoalDTO — tipos do módulo Caixa Pessoal (API)
+// Espelho do CaixaPessoalDTO.ts do frontend.
+// Sprints futuras ampliarão estas interfaces.
+// ============================================================
+
+// Sprint 2 — Cofre físico
+export interface CedulaCofreDTO {
+  id_cofre?: number;
+  valor_cedula: number;   // 2 | 5 | 10 | 20 | 50 | 100 | 200
+  quantidade: number;
+}
+
+export interface CofreFisicoDTO {
+  cedulas: CedulaCofreDTO[];
+  total: number;
+}
+
+// Sprint 3 — Movimentações
+export type TipoMovimentacao = 'entrada' | 'saida';
+
+export interface MovimentacaoDTO {
+  id_movimentacao?: number;
+  tipo: TipoMovimentacao;
+  valor: number;
+  categoria: string;
+  descricao?: string;
+  data: string;
+}
+
+// Sprint 4 — Contas
+export type TipoConta = 'pagar' | 'receber';
+
+export interface ContaDTO {
+  id_conta?: number;
+  tipo: TipoConta;
+  descricao: string;
+  valor: number;
+  vencimento: string;
+  pago: boolean;
+}
+
+// Sprint 5 — Metas
+export interface MetaDTO {
+  id_meta?: number;
+  nome: string;
+  descricao?: string;
+  valor_alvo: number;
+  valor_atual: number;
+  prazo?: string;
+}

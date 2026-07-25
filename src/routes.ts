@@ -16,6 +16,7 @@ import { validate } from "./middleware/Validation.js";
 import { ClienteSchema } from "./schemas/ClienteSchema.js";
 import { EmprestimoSchema } from "./schemas/EmprestimoSchema.js";
 import { LoginSchema } from "./schemas/AuthSchema.js";
+import { ContaSchema } from "./schemas/ContaSchema.js";
 
 const router = Router();
 const authController = new AuthController();
@@ -74,5 +75,11 @@ router.patch('/api/caixa-pessoal/cofre/:valor_cedula', Auth.verifyToken, CaixaPe
 router.get('/api/caixa-pessoal/movimentacoes', Auth.verifyToken, CaixaPessoalController.listarMovimentacoes);
 router.post('/api/caixa-pessoal/movimentacoes', Auth.verifyToken, CaixaPessoalController.criarMovimentacao);
 router.delete('/api/caixa-pessoal/movimentacoes/:id', Auth.verifyToken, CaixaPessoalController.removerMovimentacao);
+
+// Sprint 4: Contas e Reservas
+router.get('/api/caixa-pessoal/contas', Auth.verifyToken, CaixaPessoalController.listarContas);
+router.post('/api/caixa-pessoal/contas', Auth.verifyToken, validate(ContaSchema), CaixaPessoalController.criarConta);
+router.patch('/api/caixa-pessoal/contas/:id/pagar', Auth.verifyToken, CaixaPessoalController.pagarConta);
+router.delete('/api/caixa-pessoal/contas/:id', Auth.verifyToken, CaixaPessoalController.removerConta);
 
 export { router };

@@ -175,7 +175,7 @@ export default class CaixaPessoalController {
     static async criarConta(req: Request, res: Response): Promise<any> {
         try {
             const { id } = (req as any).usuario;
-            const { tipo, descricao, valor, vencimento } = req.body;
+            const { tipo, descricao, valor, vencimento, categoria, recorrencia, lembrete_dias_antes, observacao, status } = req.body;
 
             if (!tipo || !['pagar', 'receber'].includes(tipo)) {
                 return res.status(400).json({ mensagem: 'Campo "tipo" deve ser "pagar" ou "receber".' });
@@ -196,6 +196,11 @@ export default class CaixaPessoalController {
                 descricao: descricao.trim(),
                 valor: valorNum,
                 vencimento: String(vencimento),
+                categoria: typeof categoria === 'string' ? categoria.trim() : undefined,
+                recorrencia: typeof recorrencia === 'string' ? recorrencia : undefined,
+                lembrete_dias_antes: lembrete_dias_antes !== undefined ? Number(lembrete_dias_antes) : undefined,
+                observacao: typeof observacao === 'string' ? observacao.trim() : undefined,
+                status: typeof status === 'string' ? status : undefined,
             };
 
             const novaConta = await CaixaPessoal.criarConta(Number(id), payload);

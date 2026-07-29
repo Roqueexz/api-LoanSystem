@@ -38,6 +38,13 @@ export interface ContaDTO {
   valor: number;
   vencimento: string;
   pago: boolean;
+
+  // Sprint 6 — novos campos
+  categoria?: string;
+  recorrencia?: 'nenhuma' | 'diaria' | 'semanal' | 'mensal' | 'anual';
+  lembrete_dias_antes?: number;
+  observacao?: string;
+  status?: 'pendente' | 'paga' | 'programada' | 'cancelada';
 }
 
 // Sprint 5 — Metas

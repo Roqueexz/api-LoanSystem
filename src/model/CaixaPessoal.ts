@@ -227,32 +227,103 @@ export default class CaixaPessoal {
 
     // ─── CONTAS: LISTAR ───────────────────────────────────────────────
     static async listarContas(
-        id_usuario: number
+        id_usuario: number,
+        filtros?: {
+            status?: string;
+            categoria?: string;
+            recorrencia?: string;
+            prioridade?: string;
+            q?: string;
+            dias?: number;
+        }
     ): Promise<ContaDTO[]> {
         try {
-            const query = `
-                SELECT id_conta, tipo, descricao, valor, vencimento, pago, categoria, recorrencia, lembrete_dias_antes, observacao, status, criado_em
+            let query = `
+                SELECT id_conta, tipo, descricao, valor, vencimento, pago, categoria, recorrencia, prioridade, lembrete_dias_antes, observacao, status, tags, criado_em
                 FROM caixa_pessoal_conta
                 WHERE id_usuario = $1
-                ORDER BY vencimento ASC, criado_em DESC
             `;
-            const resultado = await database.query(query, [id_usuario]);
+            const params: any[] = [id_usuario];
 
-            return resultado.rows.map((row: any) => ({
-                id_conta: row.id_conta,
-                tipo: row.tipo,
-                descricao: row.descricao,
-                valor: Number(row.valor),
-                vencimento: row.vencimento instanceof Date ? row.vencimento.toISOString().split('T')[0] : row.vencimento,
-                pago: Boolean(row.pago),
-                    categoria: row.categoria ?? null,
-                    recorrencia: row.recorrencia ?? 'nenhuma',
-                    lembrete_dias_antes: row.lembrete_dias_antes !== undefined ? Number(row.lembrete_dias_antes) : undefined,
-                    observacao: row.observacao ?? null,
-                    status: row.status ?? (row.pago ? 'paga' : 'pendente'),
-                }));
+            if (filtros?.categoria) {
+                params.push(filtros.categoria);
+                query += ` AND categoria = $${params.length}`;
+            }
+
+            if (filtros?.recorrencia) {
+                params.push(filtros.recorrencia);
+                query += ` AND recorrencia = $${params.length}`;
+            }
+
+            if (filtros?.prioridade) {
+                params.push(filtros.prioridade);
+                query += ` AND prioridade = $${params.length}`;
+            }
+
+            if (filtros?.status) {
+                if (filtros.status === 'atrasada') {
+                    query += ` AND ((status = 'atrasada') OR ((status IN ('pendente', 'programada') OR status IS NULL) AND pago = FALSE AND vencimento < CURRENT_DATE))`;
+                } else if (filtros.status === 'pendente') {
+                    query += ` AND ((status = 'pendente') OR (status IS NULL AND pago = FALSE AND vencimento >= CURRENT_DATE))`;
+                } else if (filtros.status === 'programada') {
+                    query += ` AND ((status = 'programada') OR (status IS NULL AND pago = FALSE AND vencimento > CURRENT_DATE))`;
+                } else {
+                    params.push(filtros.status);
+                    query += ` AND status = $${params.length}`;
+                }
+            }
+
+            if (filtros?.dias !== undefined) {
+                params.push(filtros.dias);
+                query += ` AND vencimento BETWEEN CURRENT_DATE AND CURRENT_DATE + $${params.length}::int`;
+            }
+
+            if (filtros?.q) {
+                params.push(`%${filtros.q}%`);
+                query += ` AND (descricao ILIKE $${params.length} OR categoria ILIKE $${params.length} OR observacao ILIKE $${params.length} OR array_to_string(tags, ',') ILIKE $${params.length})`;
+            }
+
+            query += ` ORDER BY
+                CASE
+                    WHEN status = 'atrasada' THEN 0
+                    WHEN status = 'pendente' THEN 1
+                    WHEN status = 'programada' THEN 2
+                    WHEN status = 'paga' THEN 3
+                    ELSE 4
+                END,
+                vencimento ASC,
+                criado_em DESC
+            `;
+
+            const resultado = await database.query(query, params);
+
+            return resultado.rows.map((row: any) => {
+                const vencimento = row.vencimento instanceof Date ? row.vencimento.toISOString().split('T')[0] : (row.vencimento ?? '');
+                const hoje = new Date().toISOString().slice(0, 10);
+                const isAtrasada = !row.pago && vencimento !== '' && vencimento < hoje && ['pendente', 'programada'].includes(row.status ?? 'pendente');
+                const status = row.status ?? (row.pago ? 'paga' : 'pendente');
+
+                const conta: ContaDTO = {
+                    id_conta: row.id_conta,
+                    tipo: row.tipo,
+                    descricao: row.descricao,
+                    valor: Number(row.valor),
+                    vencimento,
+                    pago: Boolean(row.pago),
+                    status: isAtrasada ? 'atrasada' : status,
+                };
+
+                if (row.categoria != null) conta.categoria = row.categoria;
+                conta.recorrencia = row.recorrencia === 'nenhuma' ? 'unica' : row.recorrencia ?? 'unica';
+                if (row.prioridade != null) conta.prioridade = row.prioridade;
+                if (row.lembrete_dias_antes !== undefined && row.lembrete_dias_antes !== null) conta.lembrete_dias_antes = Number(row.lembrete_dias_antes);
+                if (row.observacao != null) conta.observacao = row.observacao;
+                if (row.tags != null) conta.tags = row.tags;
+
+                return conta;
+            });
         } catch (error) {
-            logger.error({ error, id_usuario }, '[CaixaPessoal] Erro ao listar contas');
+            logger.error({ error, id_usuario, filtros }, '[CaixaPessoal] Erro ao listar contas');
             throw error;
         }
     }
@@ -260,7 +331,7 @@ export default class CaixaPessoal {
     // ─── CONTAS: CRIAR ────────────────────────────────────────────────
     static async criarConta(
         id_usuario: number,
-        dados: { tipo: 'pagar' | 'receber'; descricao: string; valor: number; vencimento: string; pago?: boolean; categoria?: string; recorrencia?: 'nenhuma' | 'diaria' | 'semanal' | 'mensal' | 'anual'; lembrete_dias_antes?: number; observacao?: string; status?: 'pendente' | 'paga' | 'programada' | 'cancelada' }
+        dados: { tipo: 'pagar' | 'receber'; descricao: string; valor: number; vencimento: string; pago?: boolean; categoria?: string | undefined; recorrencia?: 'unica' | 'diaria' | 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual' | undefined; prioridade?: 'alta' | 'media' | 'baixa' | undefined; lembrete_dias_antes?: number | undefined; observacao?: string | undefined; tags?: string[] | undefined; status?: 'programada' | 'pendente' | 'paga' | 'atrasada' | 'cancelada' | undefined }
     ): Promise<ContaDTO> {
         const { tipo, descricao, valor, vencimento } = dados;
 
@@ -277,10 +348,15 @@ export default class CaixaPessoal {
         }
 
         try {
+            const dataVencimento = new Date(vencimento);
+            const hoje = new Date();
+            const hojeString = hoje.toISOString().slice(0, 10);
+            const statusInicial = dados.status ?? (vencimento > hojeString ? 'programada' : 'pendente');
+
             const query = `
-                INSERT INTO caixa_pessoal_conta (id_usuario, tipo, descricao, valor, vencimento, categoria, recorrencia, lembrete_dias_antes, observacao, status)
-                VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, COALESCE($10, 'pendente'))
-                RETURNING id_conta, tipo, descricao, valor, TO_CHAR(vencimento, 'YYYY-MM-DD') as vencimento, pago, categoria, recorrencia, lembrete_dias_antes, observacao, status
+                INSERT INTO caixa_pessoal_conta (id_usuario, tipo, descricao, valor, vencimento, categoria, recorrencia, prioridade, tags, lembrete_dias_antes, observacao, status)
+                VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12)
+                RETURNING id_conta, tipo, descricao, valor, TO_CHAR(vencimento, 'YYYY-MM-DD') as vencimento, pago, categoria, recorrencia, prioridade, tags, lembrete_dias_antes, observacao, status
             `;
             const resultado = await database.query(query, [
                 id_usuario,
@@ -289,29 +365,36 @@ export default class CaixaPessoal {
                 valor,
                 vencimento,
                 dados.categoria ?? null,
-                dados.recorrencia ?? 'nenhuma',
+                dados.recorrencia ?? 'unica',
+                dados.prioridade ?? 'media',
+                dados.tags ?? null,
                 dados.lembrete_dias_antes ?? null,
                 dados.observacao ?? null,
-                dados.status ?? null,
+                statusInicial,
             ]);
 
             const row = resultado.rows[0];
 
             logger.info({ id_usuario, id_conta: row.id_conta }, '[CaixaPessoal] Conta criada');
 
-            return {
+            const conta: ContaDTO = {
                 id_conta: row.id_conta,
                 tipo: row.tipo,
                 descricao: row.descricao,
                 valor: Number(row.valor),
                 vencimento: row.vencimento,
                 pago: Boolean(row.pago),
-                categoria: row.categoria ?? null,
-                recorrencia: row.recorrencia ?? 'nenhuma',
-                lembrete_dias_antes: row.lembrete_dias_antes !== undefined ? Number(row.lembrete_dias_antes) : undefined,
-                observacao: row.observacao ?? null,
                 status: row.status ?? (row.pago ? 'paga' : 'pendente'),
             };
+
+            if (row.categoria != null) conta.categoria = row.categoria;
+            conta.recorrencia = row.recorrencia === 'nenhuma' ? 'unica' : row.recorrencia ?? 'unica';
+            if (row.prioridade != null) conta.prioridade = row.prioridade;
+            if (row.tags != null) conta.tags = row.tags;
+            if (row.lembrete_dias_antes !== undefined && row.lembrete_dias_antes !== null) conta.lembrete_dias_antes = Number(row.lembrete_dias_antes);
+            if (row.observacao != null) conta.observacao = row.observacao;
+
+            return conta;
         } catch (error) {
             logger.error({ error, id_usuario, dados }, '[CaixaPessoal] Erro ao criar conta');
             throw error;

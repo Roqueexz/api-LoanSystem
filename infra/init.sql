@@ -159,12 +159,15 @@ CREATE TABLE IF NOT EXISTS caixa_pessoal_conta (
 
     -- Campos adicionados na Sprint 6
     categoria           VARCHAR(100),
-    recorrencia         VARCHAR(20) NOT NULL DEFAULT 'nenhuma'
-                            CHECK (recorrencia IN ('nenhuma', 'diaria', 'semanal', 'mensal', 'anual')),
+    recorrencia         VARCHAR(20) NOT NULL DEFAULT 'unica'
+                            CHECK (recorrencia IN ('unica', 'diaria', 'semanal', 'quinzenal', 'mensal', 'bimestral', 'trimestral', 'semestral', 'anual')),
+    prioridade          VARCHAR(10) NOT NULL DEFAULT 'media'
+                            CHECK (prioridade IN ('alta', 'media', 'baixa')),
+    tags                TEXT[],
     lembrete_dias_antes INTEGER,
     observacao          TEXT,
     status              VARCHAR(20) NOT NULL DEFAULT 'pendente'
-                            CHECK (status IN ('pendente', 'paga')),
+                            CHECK (status IN ('programada', 'pendente', 'paga', 'atrasada', 'cancelada')),
 
     criado_em           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 

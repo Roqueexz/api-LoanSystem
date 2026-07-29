@@ -1,7 +1,18 @@
 import { z } from 'zod';
 
-// Recorrência simples: nenhuma, diária, semanal, mensal, anual
-const RecorrenciaEnum = z.enum(['nenhuma', 'diaria', 'semanal', 'mensal', 'anual']);
+const RecorrenciaEnum = z.enum([
+  'unica',
+  'diaria',
+  'semanal',
+  'quinzenal',
+  'mensal',
+  'bimestral',
+  'trimestral',
+  'semestral',
+  'anual',
+]);
+
+const PrioridadeEnum = z.enum(['alta', 'media', 'baixa']);
 
 export const ContaSchema = z.object({
   tipo: z.enum(['pagar', 'receber']),
@@ -12,9 +23,11 @@ export const ContaSchema = z.object({
   // Sprint 6 fields
   categoria: z.string().min(1).max(100).optional(),
   recorrencia: RecorrenciaEnum.optional(),
+  prioridade: PrioridadeEnum.optional(),
   lembrete_dias_antes: z.number().int().min(0).optional(),
   observacao: z.string().max(1000).optional(),
-  status: z.enum(['pendente', 'paga', 'programada', 'cancelada']).optional(),
+  tags: z.array(z.string().min(1).max(30)).max(5).optional(),
+  status: z.enum(['programada', 'pendente', 'paga', 'atrasada', 'cancelada']).optional(),
 });
 
 export type ContaInput = z.infer<typeof ContaSchema>;

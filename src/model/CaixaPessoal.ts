@@ -231,7 +231,7 @@ export default class CaixaPessoal {
     ): Promise<ContaDTO[]> {
         try {
             const query = `
-                SELECT id_conta, tipo, descricao, valor, vencimento, pago, criado_em
+                SELECT id_conta, tipo, descricao, valor, vencimento, pago, categoria, recorrencia, lembrete_dias_antes, observacao, status, criado_em
                 FROM caixa_pessoal_conta
                 WHERE id_usuario = $1
                 ORDER BY vencimento ASC, criado_em DESC
@@ -245,7 +245,12 @@ export default class CaixaPessoal {
                 valor: Number(row.valor),
                 vencimento: row.vencimento instanceof Date ? row.vencimento.toISOString().split('T')[0] : row.vencimento,
                 pago: Boolean(row.pago),
-            }));
+                    categoria: row.categoria ?? null,
+                    recorrencia: row.recorrencia ?? 'nenhuma',
+                    lembrete_dias_antes: row.lembrete_dias_antes !== undefined ? Number(row.lembrete_dias_antes) : undefined,
+                    observacao: row.observacao ?? null,
+                    status: row.status ?? (row.pago ? 'paga' : 'pendente'),
+                }));
         } catch (error) {
             logger.error({ error, id_usuario }, '[CaixaPessoal] Erro ao listar contas');
             throw error;
@@ -255,7 +260,7 @@ export default class CaixaPessoal {
     // ─── CONTAS: CRIAR ────────────────────────────────────────────────
     static async criarConta(
         id_usuario: number,
-        dados: { tipo: 'pagar' | 'receber'; descricao: string; valor: number; vencimento: string; pago?: boolean }
+        dados: { tipo: 'pagar' | 'receber'; descricao: string; valor: number; vencimento: string; pago?: boolean; categoria?: string; recorrencia?: 'nenhuma' | 'diaria' | 'semanal' | 'mensal' | 'anual'; lembrete_dias_antes?: number; observacao?: string; status?: 'pendente' | 'paga' | 'programada' | 'cancelada' }
     ): Promise<ContaDTO> {
         const { tipo, descricao, valor, vencimento } = dados;
 
@@ -273,9 +278,9 @@ export default class CaixaPessoal {
 
         try {
             const query = `
-                INSERT INTO caixa_pessoal_conta (id_usuario, tipo, descricao, valor, vencimento)
-                VALUES ($1, $2, $3, $4, $5::date)
-                RETURNING id_conta, tipo, descricao, valor, TO_CHAR(vencimento, 'YYYY-MM-DD') as vencimento, pago
+                INSERT INTO caixa_pessoal_conta (id_usuario, tipo, descricao, valor, vencimento, categoria, recorrencia, lembrete_dias_antes, observacao, status)
+                VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, COALESCE($10, 'pendente'))
+                RETURNING id_conta, tipo, descricao, valor, TO_CHAR(vencimento, 'YYYY-MM-DD') as vencimento, pago, categoria, recorrencia, lembrete_dias_antes, observacao, status
             `;
             const resultado = await database.query(query, [
                 id_usuario,
@@ -283,6 +288,11 @@ export default class CaixaPessoal {
                 descricao,
                 valor,
                 vencimento,
+                dados.categoria ?? null,
+                dados.recorrencia ?? 'nenhuma',
+                dados.lembrete_dias_antes ?? null,
+                dados.observacao ?? null,
+                dados.status ?? null,
             ]);
 
             const row = resultado.rows[0];
@@ -296,6 +306,11 @@ export default class CaixaPessoal {
                 valor: Number(row.valor),
                 vencimento: row.vencimento,
                 pago: Boolean(row.pago),
+                categoria: row.categoria ?? null,
+                recorrencia: row.recorrencia ?? 'nenhuma',
+                lembrete_dias_antes: row.lembrete_dias_antes !== undefined ? Number(row.lembrete_dias_antes) : undefined,
+                observacao: row.observacao ?? null,
+                status: row.status ?? (row.pago ? 'paga' : 'pendente'),
             };
         } catch (error) {
             logger.error({ error, id_usuario, dados }, '[CaixaPessoal] Erro ao criar conta');
@@ -311,7 +326,7 @@ export default class CaixaPessoal {
         try {
             const query = `
                 UPDATE caixa_pessoal_conta
-                SET pago = TRUE
+                SET pago = TRUE, status = 'paga'
                 WHERE id_conta = $1 AND id_usuario = $2
                 RETURNING id_conta
             `;

@@ -163,7 +163,25 @@ export default class CaixaPessoalController {
     static async listarContas(req: Request, res: Response): Promise<any> {
         try {
             const { id } = (req as any).usuario;
-            const contas = await CaixaPessoal.listarContas(Number(id));
+            const { status, categoria, recorrencia, prioridade, q, dias } = req.query;
+
+            const filtros: {
+                status?: string;
+                categoria?: string;
+                recorrencia?: string;
+                prioridade?: string;
+                q?: string;
+                dias?: number;
+            } = {};
+
+            if (typeof status === 'string') filtros.status = status;
+            if (typeof categoria === 'string') filtros.categoria = categoria;
+            if (typeof recorrencia === 'string') filtros.recorrencia = recorrencia;
+            if (typeof prioridade === 'string') filtros.prioridade = prioridade;
+            if (typeof q === 'string') filtros.q = q;
+            if (typeof dias === 'string' && !isNaN(Number(dias))) filtros.dias = Number(dias);
+
+            const contas = await CaixaPessoal.listarContas(Number(id), filtros);
             return res.status(200).json(contas);
         } catch (error) {
             logger.error({ error }, '[CaixaPessoalController] Erro ao listar contas');
@@ -175,7 +193,7 @@ export default class CaixaPessoalController {
     static async criarConta(req: Request, res: Response): Promise<any> {
         try {
             const { id } = (req as any).usuario;
-            const { tipo, descricao, valor, vencimento, categoria, recorrencia, lembrete_dias_antes, observacao, status } = req.body;
+            const { tipo, descricao, valor, vencimento, categoria, recorrencia, prioridade, lembrete_dias_antes, observacao, tags, status } = req.body;
 
             if (!tipo || !['pagar', 'receber'].includes(tipo)) {
                 return res.status(400).json({ mensagem: 'Campo "tipo" deve ser "pagar" ou "receber".' });
@@ -191,16 +209,26 @@ export default class CaixaPessoalController {
             }
 
             // vencimento no formato YYYY-MM-DD (ou omitido será validado no model)
+            const RECORRENCIA_VALIDA = ['unica', 'diaria', 'semanal', 'quinzenal', 'mensal', 'bimestral', 'trimestral', 'semestral', 'anual'] as const;
+            const PRIORIDADE_VALIDA = ['alta', 'media', 'baixa'] as const;
+            const STATUS_VALIDO = ['programada', 'pendente', 'paga', 'atrasada', 'cancelada'] as const;
+
+            const recorrenciaValor = typeof recorrencia === 'string' && RECORRENCIA_VALIDA.includes(recorrencia as any) ? recorrencia as typeof RECORRENCIA_VALIDA[number] : undefined;
+            const prioridadeValor = typeof prioridade === 'string' && PRIORIDADE_VALIDA.includes(prioridade as any) ? prioridade as typeof PRIORIDADE_VALIDA[number] : undefined;
+            const statusValor = typeof status === 'string' && STATUS_VALIDO.includes(status as any) ? status as typeof STATUS_VALIDO[number] : undefined;
+
             const payload = {
                 tipo,
                 descricao: descricao.trim(),
                 valor: valorNum,
                 vencimento: String(vencimento),
                 categoria: typeof categoria === 'string' ? categoria.trim() : undefined,
-                recorrencia: typeof recorrencia === 'string' ? recorrencia : undefined,
+                recorrencia: recorrenciaValor,
+                prioridade: prioridadeValor,
                 lembrete_dias_antes: lembrete_dias_antes !== undefined ? Number(lembrete_dias_antes) : undefined,
                 observacao: typeof observacao === 'string' ? observacao.trim() : undefined,
-                status: typeof status === 'string' ? status : undefined,
+                tags: Array.isArray(tags) ? tags.filter((tag) => typeof tag === 'string' && tag.trim().length > 0).map((tag) => tag.trim()) : undefined,
+                status: statusValor,
             };
 
             const novaConta = await CaixaPessoal.criarConta(Number(id), payload);

@@ -57,4 +57,6 @@ export interface MetaDTO {
   valor_alvo: number;
   valor_atual: number;
   prazo?: string;
+  percentual?: number | undefined;
+  dias_restantes?: number | undefined;
 }

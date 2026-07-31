@@ -17,6 +17,7 @@ import { ClienteSchema } from "./schemas/ClienteSchema.js";
 import { EmprestimoSchema } from "./schemas/EmprestimoSchema.js";
 import { LoginSchema } from "./schemas/AuthSchema.js";
 import { ContaSchema } from "./schemas/ContaSchema.js";
+import { MetaSchema, MetaUpdateSchema } from "./schemas/MetaSchema.js";
 
 const router = Router();
 const authController = new AuthController();
@@ -81,5 +82,11 @@ router.get('/api/caixa-pessoal/contas', Auth.verifyToken, CaixaPessoalController
 router.post('/api/caixa-pessoal/contas', Auth.verifyToken, validate(ContaSchema), CaixaPessoalController.criarConta);
 router.patch('/api/caixa-pessoal/contas/:id/pagar', Auth.verifyToken, CaixaPessoalController.pagarConta);
 router.delete('/api/caixa-pessoal/contas/:id', Auth.verifyToken, CaixaPessoalController.removerConta);
+
+// Sprint 7: Metas Financeiras
+router.get('/api/caixa-pessoal/metas', Auth.verifyToken, CaixaPessoalController.listarMetas);
+router.post('/api/caixa-pessoal/metas', Auth.verifyToken, validate(MetaSchema), CaixaPessoalController.criarMeta);
+router.put('/api/caixa-pessoal/metas/:id', Auth.verifyToken, validate(MetaUpdateSchema), CaixaPessoalController.atualizarMeta);
+router.delete('/api/caixa-pessoal/metas/:id', Auth.verifyToken, CaixaPessoalController.removerMeta);
 
 export { router };

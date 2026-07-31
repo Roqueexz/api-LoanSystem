@@ -282,4 +282,87 @@ export default class CaixaPessoalController {
             return res.status(500).json({ mensagem: 'Erro interno ao remover conta.' });
         }
     }
+
+    // ─── GET /api/caixa-pessoal/metas ───────────────────────────────────
+    static async listarMetas(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            const metas = await CaixaPessoal.listarMetas(Number(id));
+            return res.status(200).json(metas);
+        } catch (error) {
+            logger.error({ error }, '[CaixaPessoalController] Erro ao listar metas');
+            return res.status(500).json({ mensagem: 'Erro interno ao listar metas.' });
+        }
+    }
+
+    // ─── POST /api/caixa-pessoal/metas ──────────────────────────────────
+    static async criarMeta(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            const { nome, descricao, valor_alvo, valor_atual, prazo } = req.body;
+            const meta = await CaixaPessoal.criarMeta(Number(id), {
+                nome,
+                descricao,
+                valor_alvo,
+                valor_atual,
+                prazo,
+            });
+            return res.status(201).json(meta);
+        } catch (error) {
+            logger.error({ error }, '[CaixaPessoalController] Erro ao criar meta');
+            return res.status(500).json({ mensagem: 'Erro interno ao criar meta.' });
+        }
+    }
+
+    // ─── PUT /api/caixa-pessoal/metas/:id ───────────────────────────────
+    static async atualizarMeta(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            const id_meta = Number(req.params.id);
+            const { nome, descricao, valor_alvo, valor_atual, prazo } = req.body;
+
+            if (isNaN(id_meta) || id_meta <= 0) {
+                return res.status(400).json({ mensagem: 'ID da meta inválido.' });
+            }
+
+            const meta = await CaixaPessoal.atualizarMeta(Number(id), id_meta, {
+                nome,
+                descricao,
+                valor_alvo,
+                valor_atual,
+                prazo,
+            });
+
+            if (!meta) {
+                return res.status(404).json({ mensagem: 'Meta não encontrada ou não pertence ao usuário.' });
+            }
+
+            return res.status(200).json(meta);
+        } catch (error) {
+            logger.error({ error }, '[CaixaPessoalController] Erro ao atualizar meta');
+            return res.status(500).json({ mensagem: 'Erro interno ao atualizar meta.' });
+        }
+    }
+
+    // ─── DELETE /api/caixa-pessoal/metas/:id ─────────────────────────────
+    static async removerMeta(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            const id_meta = Number(req.params.id);
+
+            if (isNaN(id_meta) || id_meta <= 0) {
+                return res.status(400).json({ mensagem: 'ID da meta inválido.' });
+            }
+
+            const deletado = await CaixaPessoal.removerMeta(Number(id), id_meta);
+            if (!deletado) {
+                return res.status(404).json({ mensagem: 'Meta não encontrada ou não pertence ao usuário.' });
+            }
+
+            return res.status(200).json({ mensagem: 'Meta removida com sucesso.' });
+        } catch (error) {
+            logger.error({ error }, '[CaixaPessoalController] Erro ao remover meta');
+            return res.status(500).json({ mensagem: 'Erro interno ao remover meta.' });
+        }
+    }
 }

@@ -3,7 +3,8 @@ import type {
   CofreFisicoDTO, 
   CedulaCofreDTO, 
   MovimentacaoDTO,
-  ContaDTO
+  ContaDTO,
+  MetaDTO,
 } from '../interface/CaixaPessoalDTO.js';
 import databaseInstance from './DatabaseModel.js';
 import logger from '../services/Logger.js';
@@ -453,4 +454,202 @@ export default class CaixaPessoal {
             throw error;
         }
     }
+
+        // ─── METAS: LISTAR ─────────────────────────────────────────────────
+        static async listarMetas(id_usuario: number): Promise<MetaDTO[]> {
+            try {
+                const query = `
+                    SELECT id_meta, nome, descricao, valor_alvo, valor_atual, prazo
+                    FROM caixa_pessoal_meta
+                    WHERE id_usuario = $1
+                    ORDER BY criado_em DESC
+                `;
+                const resultado = await database.query(query, [id_usuario]);
+
+                return resultado.rows.map((row: any) => {
+                    const valorAlvo = Number(row.valor_alvo ?? 0);
+                    const valorAtual = Number(row.valor_atual ?? 0);
+                    const percentual = valorAlvo > 0 ? Number(((valorAtual / valorAlvo) * 100).toFixed(2)) : 0;
+                    const prazo = row.prazo instanceof Date ? row.prazo.toISOString().split('T')[0] : row.prazo;
+                    let dias_restantes: number | undefined;
+
+                    if (prazo) {
+                        const hoje = new Date();
+                        hoje.setHours(0, 0, 0, 0);
+                        const dataPrazo = new Date(prazo);
+                        dataPrazo.setHours(0, 0, 0, 0);
+                        dias_restantes = Math.max(0, Math.ceil((dataPrazo.getTime() - hoje.getTime()) / 86_400_000));
+                    }
+
+                    return {
+                        id_meta: row.id_meta,
+                        nome: row.nome,
+                        descricao: row.descricao,
+                        valor_alvo: valorAlvo,
+                        valor_atual: valorAtual,
+                        prazo,
+                        percentual,
+                        dias_restantes,
+                    };
+                });
+            } catch (error) {
+                logger.error({ error, id_usuario }, '[CaixaPessoal] Erro ao listar metas');
+                throw error;
+            }
+        }
+
+        // ─── METAS: CRIAR ──────────────────────────────────────────────────
+        static async criarMeta(
+            id_usuario: number,
+            dados: Omit<MetaDTO, 'id_meta' | 'percentual' | 'dias_restantes'>
+        ): Promise<MetaDTO> {
+            const { nome, descricao, valor_alvo, valor_atual = 0, prazo } = dados;
+
+            if (!nome || nome.trim() === '') {
+                throw new Error('Nome da meta é obrigatório.');
+            }
+
+            if (valor_alvo <= 0) {
+                throw new Error('Valor alvo deve ser maior que zero.');
+            }
+
+            if (valor_atual < 0) {
+                throw new Error('Valor atual não pode ser negativo.');
+            }
+
+            try {
+                const query = `
+                    INSERT INTO caixa_pessoal_meta (id_usuario, nome, descricao, valor_alvo, valor_atual, prazo)
+                    VALUES ($1, $2, $3, $4, $5, $6::date)
+                    RETURNING id_meta, nome, descricao, valor_alvo, valor_atual, prazo
+                `;
+                const resultado = await database.query(query, [
+                    id_usuario,
+                    nome.trim(),
+                    dados.descricao ?? null,
+                    valor_alvo,
+                    valor_atual,
+                    prazo ?? null,
+                ]);
+
+                const row = resultado.rows[0];
+                const percent = valor_alvo > 0 ? Number(((valor_atual / valor_alvo) * 100).toFixed(2)) : 0;
+                const prazoValor = row.prazo instanceof Date ? row.prazo.toISOString().split('T')[0] : row.prazo;
+                let dias_restantes: number | undefined;
+                if (prazoValor) {
+                    const hoje = new Date();
+                    hoje.setHours(0, 0, 0, 0);
+                    const dataPrazo = new Date(prazoValor);
+                    dataPrazo.setHours(0, 0, 0, 0);
+                    dias_restantes = Math.max(0, Math.ceil((dataPrazo.getTime() - hoje.getTime()) / 86_400_000));
+                }
+
+                return {
+                    id_meta: row.id_meta,
+                    nome: row.nome,
+                    descricao: row.descricao,
+                    valor_alvo: Number(row.valor_alvo),
+                    valor_atual: Number(row.valor_atual),
+                    prazo: prazoValor,
+                    percentual: percent,
+                    dias_restantes,
+                };
+            } catch (error) {
+                logger.error({ error, id_usuario, dados }, '[CaixaPessoal] Erro ao criar meta');
+                throw error;
+            }
+        }
+
+        // ─── METAS: ATUALIZAR ──────────────────────────────────────────────
+        static async atualizarMeta(
+            id_usuario: number,
+            id_meta: number,
+            dados: Partial<Omit<MetaDTO, 'id_meta' | 'percentual' | 'dias_restantes'>>
+        ): Promise<MetaDTO | null> {
+            const campos: string[] = [];
+            const params: any[] = [id_meta, id_usuario];
+
+            if (dados.nome !== undefined) {
+                params.push(dados.nome.trim());
+                campos.push(`nome = $${params.length}`);
+            }
+            if (dados.descricao !== undefined) {
+                params.push(dados.descricao || null);
+                campos.push(`descricao = $${params.length}`);
+            }
+            if (dados.valor_alvo !== undefined) {
+                params.push(dados.valor_alvo);
+                campos.push(`valor_alvo = $${params.length}`);
+            }
+            if (dados.valor_atual !== undefined) {
+                params.push(dados.valor_atual);
+                campos.push(`valor_atual = $${params.length}`);
+            }
+            if (dados.prazo !== undefined) {
+                params.push(dados.prazo || null);
+                campos.push(`prazo = $${params.length}::date`);
+            }
+
+            if (campos.length === 0) {
+                return null;
+            }
+
+            try {
+                const query = `
+                    UPDATE caixa_pessoal_meta
+                    SET ${campos.join(', ')}
+                    WHERE id_meta = $1 AND id_usuario = $2
+                    RETURNING id_meta, nome, descricao, valor_alvo, valor_atual, prazo
+                `;
+
+                const resultado = await database.query(query, params);
+                if (resultado.rowCount === 0) {
+                    return null;
+                }
+
+                const row = resultado.rows[0];
+                const valorAlvo = Number(row.valor_alvo ?? 0);
+                const valorAtual = Number(row.valor_atual ?? 0);
+                const percentual = valorAlvo > 0 ? Number(((valorAtual / valorAlvo) * 100).toFixed(2)) : 0;
+                const prazo = row.prazo instanceof Date ? row.prazo.toISOString().split('T')[0] : row.prazo;
+                let dias_restantes: number | undefined;
+                if (prazo) {
+                    const hoje = new Date();
+                    hoje.setHours(0, 0, 0, 0);
+                    const dataPrazo = new Date(prazo);
+                    dataPrazo.setHours(0, 0, 0, 0);
+                    dias_restantes = Math.max(0, Math.ceil((dataPrazo.getTime() - hoje.getTime()) / 86_400_000));
+                }
+
+                return {
+                    id_meta: row.id_meta,
+                    nome: row.nome,
+                    descricao: row.descricao,
+                    valor_alvo: valorAlvo,
+                    valor_atual: valorAtual,
+                    prazo,
+                    percentual,
+                    dias_restantes,
+                };
+            } catch (error) {
+                logger.error({ error, id_usuario, id_meta, dados }, '[CaixaPessoal] Erro ao atualizar meta');
+                throw error;
+            }
+        }
+
+        // ─── METAS: REMOVER ────────────────────────────────────────────────
+        static async removerMeta(id_usuario: number, id_meta: number): Promise<boolean> {
+            try {
+                const query = `
+                    DELETE FROM caixa_pessoal_meta
+                    WHERE id_meta = $1 AND id_usuario = $2
+                    RETURNING id_meta
+                `;
+                const resultado = await database.query(query, [id_meta, id_usuario]);
+                return (resultado.rowCount ?? 0) > 0;
+            } catch (error) {
+                logger.error({ error, id_usuario, id_meta }, '[CaixaPessoal] Erro ao remover meta');
+                throw error;
+            }
+        }
 }

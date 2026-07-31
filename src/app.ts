@@ -14,21 +14,25 @@ async function iniciarServidor() {
 
     if (conexaoOk) {
       server.listen(port, () => {
-        logger.info({ port, db: process.env.DB_NAME }, 'Servidor iniciado com sucesso');
-        console.log(`🚀 Servidor rodando em http://localhost:${port}`);
-        console.log(`📊 Banco: ${process.env.DB_NAME}`);
-        console.log(`🔒 CORS permitido: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+        logger.info(
+          { port, db: process.env.DB_NAME },
+          "Servidor iniciado com sucesso",
+        );
+        console.log(` Servidor rodando em http://localhost:${port}`);
+        console.log(` Banco: ${process.env.DB_NAME}`);
+        console.log(
+          ` CORS permitido: ${process.env.FRONTEND_URL || "http://localhost:5173"}`,
+        );
       });
     } else {
-      logger.error('Nao foi possivel conectar ao banco de dados');
-      console.error('❌ Nao foi possivel conectar ao banco de dados');
+      logger.error("Nao foi possivel conectar ao banco de dados");
+      console.error(" Nao foi possivel conectar ao banco de dados");
       process.exit(1);
     }
   } catch (err) {
-    logger.error({ error: err }, 'Erro ao iniciar servidor');
-    console.error('❌ Erro ao iniciar servidor:', err);
+    logger.error({ error: err }, "Erro ao iniciar servidor");
+    console.error(" Erro ao iniciar servidor:", err);
     process.exit(1);
   }
 }
-
 iniciarServidor();

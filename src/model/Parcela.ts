@@ -210,36 +210,92 @@ export default class Parcela {
   }
 
   static async marcarComoPaga(id_parcela: number, data_pagamento?: Date): Promise<boolean> {
+    const client = await database.connect();
+
     try {
-      const query = `
+      await client.query('BEGIN');
+
+      const atualizarParcela = `
         UPDATE Parcela
         SET status_parcela = 'pago',
             data_pagamento = $2,
             valor_pago = valor_esperado
         WHERE id_parcela = $1
+        RETURNING id_emprestimo
       `;
-      const res = await database.query(query, [id_parcela, data_pagamento ?? new Date()]);
-      return (res.rowCount ?? 0) > 0;
+
+      const updateRes = await client.query(atualizarParcela, [
+        id_parcela,
+        data_pagamento ?? new Date(),
+      ]);
+
+      if ((updateRes.rowCount ?? 0) === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+
+      const id_emprestimo = updateRes.rows[0].id_emprestimo;
+
+      const parcelasNaoPagas = await client.query(
+        `SELECT COUNT(*)::int AS total
+         FROM Parcela
+         WHERE id_emprestimo = $1 AND status_parcela != 'pago'`,
+        [id_emprestimo]
+      );
+
+      if ((parcelasNaoPagas.rows[0]?.total ?? 0) === 0) {
+        await client.query(
+          `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_emprestimo = $1`,
+          [id_emprestimo]
+        );
+      }
+
+      await client.query('COMMIT');
+      return true;
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error(`[ParcelaModel] Erro ao dar baixa na parcela (id: ${id_parcela}):`, error);
       throw error;
+    } finally {
+      client.release();
     }
   }
 
   static async desfazerPagamento(id_parcela: number): Promise<boolean> {
+    const client = await database.connect();
+
     try {
+      await client.query('BEGIN');
+
       const query = `
         UPDATE Parcela
         SET status_parcela = 'pendente',
             data_pagamento = NULL,
             valor_pago = 0.00
         WHERE id_parcela = $1
+        RETURNING id_emprestimo
       `;
-      const res = await database.query(query, [id_parcela]);
-      return (res.rowCount ?? 0) > 0;
+
+      const res = await client.query(query, [id_parcela]);
+      if ((res.rowCount ?? 0) === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+
+      const id_emprestimo = res.rows[0].id_emprestimo;
+      await client.query(
+        `UPDATE Emprestimo SET status_emprestimo = TRUE WHERE id_emprestimo = $1`,
+        [id_emprestimo]
+      );
+
+      await client.query('COMMIT');
+      return true;
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error(`[ParcelaModel] Erro ao desfazer pagamento da parcela (id: ${id_parcela}):`, error);
       throw error;
+    } finally {
+      client.release();
     }
   }
 

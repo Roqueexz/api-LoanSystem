@@ -10,6 +10,7 @@ import EmprestimoController from "./controller/EmprestimoController.js";
 import ParcelaController from "./controller/ParcelaController.js";
 import CaixaController from "./controller/CaixaController.js";
 import CaixaPessoalController from "./controller/CaixaPessoalController.js";
+import CalendarioController from "./controller/CalendarioController.js";
 import { AuthController } from "./controller/AuthController.js";
 
 import { validate } from "./middleware/Validation.js";
@@ -135,6 +136,30 @@ router.get(
   "/api/caixa/indicadores",
   Auth.verifyToken,
   CaixaController.indicadoresFinanceiros,
+);
+
+// ============================================
+// ROTAS DO CALENDÁRIO FINANCEIRO
+// ============================================
+router.get(
+  "/api/calendario/eventos",
+  Auth.verifyToken,
+  CalendarioController.eventos,
+);
+router.get(
+  "/api/calendario/previsualizar",
+  Auth.verifyToken,
+  CalendarioController.previsualizarMes,
+);
+router.post(
+  "/api/calendario/eventos",
+  Auth.verifyToken,
+  CalendarioController.criarEvento,
+);
+router.patch(
+  "/api/calendario/regras",
+  Auth.verifyToken,
+  CalendarioController.atualizarRegra,
 );
 
 // ============================================

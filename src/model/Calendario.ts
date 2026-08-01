@@ -6,129 +6,167 @@ const database = databaseInstance.pool;
 
 export default class Calendario {
 
-    static async obterEventosCalendario(tipo?: string, data?: string): Promise<any[]> {
-        try {
-            const dataAtual = new Date();
-            const primeiroDiaMes = new Date(dataAtual.getFullYear(), dataAtual.getMonth(), 1);
-            const ultimoDiaMes = new Date(dataAtual.getFullYear(), dataAtual.getMonth() + 1, 0);
-            
-            const dataInicio = formatarDataISO(primeiroDiaMes);
-            const dataFim = formatarDataISO(ultimoDiaMes);
+    private static montarRangeMes(data?: string): { inicio: string; fim: string } {
+        const referencia = data ? new Date(data) : new Date();
+        const primeiroDiaMes = new Date(referencia.getFullYear(), referencia.getMonth(), 1);
+        const ultimoDiaMes = new Date(referencia.getFullYear(), referencia.getMonth() + 1, 0);
 
-            // Query para eventos do calendário
+        return {
+            inicio: formatarDataISO(primeiroDiaMes),
+            fim: formatarDataISO(ultimoDiaMes),
+        };
+    }
+
+    static async obterEventosCalendario(idUsuario: number, tipo?: string, data?: string): Promise<any[]> {
+        try {
+            const { inicio, fim } = this.montarRangeMes(data);
+            const tipoEvento = tipo?.trim() || null;
+
             const queryEventos = `
-                SELECT 
-                    'parcela' AS tipo_evento,
-                    p.data_vencimento AS data_evento,
-                    p.valor_esperado AS valor,
-                    'Parcela de empréstimo' AS descricao,
-                    'blue' AS color
-                FROM Parcela p
-                JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-                WHERE p.data_vencimento BETWEEN $1 AND $2
-                AND e.status_emprestimo = TRUE
-                
-                UNION ALL
-                
-                SELECT 
-                    'conta' AS tipo_evento,
-                    c.data_vencimento AS data_evento,
-                    c.valor_conta AS valor,
-                    c.descricao AS descricao,
-                    'red' AS color
-                FROM Conta c
-                WHERE c.data_vencimento BETWEEN $1 AND $2
-                AND c.status_conta IN ('pendente', 'programada')
-                
-                UNION ALL
-                
-                SELECT 
-                    'meta' AS tipo_evento,
-                    m.data_limite AS data_evento,
-                    m.valor_meta AS valor,
-                    m.descricao AS descricao,
-                    'green' AS color
-                FROM Meta m
-                WHERE m.data_limite BETWEEN $1 AND $2
-                AND m.status_meta = 'ativa'
+                SELECT
+                    tipo_evento,
+                    data_evento,
+                    valor,
+                    descricao,
+                    color,
+                    categoria,
+                    prioridade,
+                    metadata
+                FROM (
+                    SELECT
+                        'recebimento' AS tipo_evento,
+                        TO_CHAR(p.data_vencimento, 'YYYY-MM-DD') AS data_evento,
+                        p.valor_esperado::numeric AS valor,
+                        CONCAT('Parcela ', p.numero_parcela, ' - ', 'Empréstimo #', e.id_emprestimo) AS descricao,
+                        'blue' AS color,
+                        'recebimento' AS categoria,
+                        NULL AS prioridade,
+                        jsonb_build_object('id_parcela', p.id_parcela, 'numero_parcela', p.numero_parcela) AS metadata
+                    FROM Parcela p
+                    JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+                    WHERE p.data_vencimento BETWEEN $1 AND $2
+                      AND e.status_emprestimo = TRUE
+
+                    UNION ALL
+
+                    SELECT
+                        'conta' AS tipo_evento,
+                        TO_CHAR(c.vencimento, 'YYYY-MM-DD') AS data_evento,
+                        c.valor::numeric AS valor,
+                        c.descricao AS descricao,
+                        'red' AS color,
+                        COALESCE(c.categoria, 'financeira') AS categoria,
+                        c.prioridade AS prioridade,
+                        jsonb_build_object('id_conta', c.id_conta, 'status', c.status) AS metadata
+                    FROM caixa_pessoal_conta c
+                    WHERE c.vencimento BETWEEN $1 AND $2
+                      AND c.id_usuario = $3
+                      AND c.status IN ('pendente', 'programada', 'atrasada')
+
+                    UNION ALL
+
+                    SELECT
+                        'meta' AS tipo_evento,
+                        TO_CHAR(m.prazo, 'YYYY-MM-DD') AS data_evento,
+                        m.valor_alvo::numeric AS valor,
+                        m.nome AS descricao,
+                        'green' AS color,
+                        'meta' AS categoria,
+                        NULL AS prioridade,
+                        jsonb_build_object('id_meta', m.id_meta, 'valor_atual', m.valor_atual) AS metadata
+                    FROM caixa_pessoal_meta m
+                    WHERE m.prazo BETWEEN $1 AND $2
+                      AND m.id_usuario = $3
+                      AND m.prazo IS NOT NULL
+                ) AS eventos
+                WHERE ($4::text IS NULL OR tipo_evento = $4)
+                ORDER BY data_evento, tipo_evento;
             `;
 
-            const params = [dataInicio, dataFim];
+            const params = [inicio, fim, idUsuario, tipoEvento];
             const resultado = await database.query(queryEventos, params);
-            
-            return resultado.rows;
+
+            return resultado.rows.map((row: any) => ({
+                ...row,
+                valor: Number(row.valor),
+                metadata: row.metadata ?? null,
+            }));
         } catch (error) {
-            logger.error({ error, tipo, data }, '[CalendarioModel] Erro ao obter eventos do calendário');
+            logger.error({ error, idUsuario, tipo, data }, '[CalendarioModel] Erro ao obter eventos do calendário');
             throw error;
         }
     }
 
-    static async previsualizarEventosMes(anoMes?: string): Promise<any[]> {
+    static async previsualizarEventosMes(idUsuario: number, anoMes?: string): Promise<any[]> {
         try {
             const dataAtual = new Date();
             const ano = anoMes ? Number(anoMes.split('-')[0]) : dataAtual.getFullYear();
             const mes = anoMes ? Number(anoMes.split('-')[1]) : dataAtual.getMonth() + 1;
-            
+
             const primeiroDia = new Date(ano, mes - 1, 1);
             const ultimoDia = new Date(ano, mes, 0);
-            
+
             const dataInicio = formatarDataISO(primeiroDia);
             const dataFim = formatarDataISO(ultimoDia);
 
-            // Query para previsualização do mês
             const queryPrevisualizacao = `
-                SELECT 
+                SELECT
                     data_evento,
                     COUNT(*) AS total_eventos,
                     SUM(valor) AS total_valor,
                     ARRAY_AGG(tipo_evento) AS tipos
                 FROM (
-                    SELECT 
-                        p.data_vencimento AS data_evento,
-                        p.valor_esperado AS valor,
-                        'parcela' AS tipo_evento
+                    SELECT
+                        TO_CHAR(p.data_vencimento, 'YYYY-MM-DD') AS data_evento,
+                        p.valor_esperado::numeric AS valor,
+                        'recebimento' AS tipo_evento
                     FROM Parcela p
                     JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
                     WHERE p.data_vencimento BETWEEN $1 AND $2
-                    AND e.status_emprestimo = TRUE
-                    
+                      AND e.status_emprestimo = TRUE
+
                     UNION ALL
-                    
-                    SELECT 
-                        c.data_vencimento AS data_evento,
-                        c.valor_conta AS valor,
+
+                    SELECT
+                        TO_CHAR(c.vencimento, 'YYYY-MM-DD') AS data_evento,
+                        c.valor::numeric AS valor,
                         'conta' AS tipo_evento
-                    FROM Conta c
-                    WHERE c.data_vencimento BETWEEN $1 AND $2
-                    AND c.status_conta IN ('pendente', 'programada')
-                    
+                    FROM caixa_pessoal_conta c
+                    WHERE c.vencimento BETWEEN $1 AND $2
+                      AND c.id_usuario = $3
+                      AND c.status IN ('pendente', 'programada', 'atrasada')
+
                     UNION ALL
-                    
-                    SELECT 
-                        m.data_limite AS data_evento,
-                        m.valor_meta AS valor,
+
+                    SELECT
+                        TO_CHAR(m.prazo, 'YYYY-MM-DD') AS data_evento,
+                        m.valor_alvo::numeric AS valor,
                         'meta' AS tipo_evento
-                    FROM Meta m
-                    WHERE m.data_limite BETWEEN $1 AND $2
-                    AND m.status_meta = 'ativa'
+                    FROM caixa_pessoal_meta m
+                    WHERE m.prazo BETWEEN $1 AND $2
+                      AND m.id_usuario = $3
+                      AND m.prazo IS NOT NULL
                 ) AS eventos
                 GROUP BY data_evento
                 ORDER BY data_evento
             `;
 
-            const resultado = await database.query(queryPrevisualizacao, [dataInicio, dataFim]);
-            
-            return resultado.rows;
+            const resultado = await database.query(queryPrevisualizacao, [dataInicio, dataFim, idUsuario]);
+
+            return resultado.rows.map((row: any) => ({
+                ...row,
+                total_eventos: Number(row.total_eventos),
+                total_valor: Number(row.total_valor),
+                tipos: row.tipos ?? [],
+            }));
         } catch (error) {
-            logger.error({ error, anoMes }, '[CalendarioModel] Erro ao previsualizar eventos do mês');
+            logger.error({ error, idUsuario, anoMes }, '[CalendarioModel] Erro ao previsualizar eventos do mês');
             throw error;
         }
     }
 
     static async criarEvento(data: any): Promise<any> {
         try {
-            // Lógica para criar eventos personalizados
-            // Será implementado futuramente
             return { sucesso: true };
         } catch (error) {
             logger.error({ error }, '[CalendarioModel] Erro ao criar evento');
@@ -138,8 +176,6 @@ export default class Calendario {
 
     static async atualizarRegraCalendario(tipo: string, dataKey: string, hasRule: boolean): Promise<any> {
         try {
-            // Lógica para atualizar regras de calendário
-            // Será implementado futuramente
             return { sucesso: true };
         } catch (error) {
             logger.error({ error }, '[CalendarioModel] Erro ao atualizar regra de calendário');

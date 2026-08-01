@@ -6,7 +6,11 @@ export default class CalendarioController {
   static async eventos(req: Request, res: Response) {
     try {
       const { tipo, data } = req.query;
+      const usuario = (req as any).usuario;
+      const idUsuario = Number(usuario?.id ?? 0);
+
       const eventos = await Calendario.obterEventosCalendario(
+        idUsuario,
         tipo as string,
         data as string,
       );
@@ -22,7 +26,11 @@ export default class CalendarioController {
   static async previsualizarMes(req: Request, res: Response) {
     try {
       const { anoMes } = req.query;
+      const usuario = (req as any).usuario;
+      const idUsuario = Number(usuario?.id ?? 0);
+
       const eventos = await Calendario.previsualizarEventosMes(
+        idUsuario,
         anoMes as string,
       );
       res.status(200).json(eventos);

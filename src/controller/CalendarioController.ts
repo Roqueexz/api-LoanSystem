@@ -5,19 +5,23 @@ import logger from "../services/Logger.js";
 export default class CalendarioController {
   static async eventos(req: Request, res: Response) {
     try {
-      const { tipo, data } = req.query;
       const usuario = (req as any).usuario;
-      const idUsuario = Number(usuario?.id ?? 0);
+      const idUsuario = Number(usuario?.id);
 
+      if (!Number.isFinite(idUsuario)) {
+        return res.status(401).json({ mensagem: "Usuário não autenticado." });
+      }
+
+      const { tipo, data } = req.query;
       const eventos = await Calendario.obterEventosCalendario(
         idUsuario,
         tipo as string,
         data as string,
       );
-      res.status(200).json(eventos);
+      return res.status(200).json(eventos);
     } catch (error) {
       logger.error({ error }, "[CalendarioController] Erro ao obter eventos");
-      res
+      return res
         .status(500)
         .json({ mensagem: "Erro interno ao recuperar eventos do calendário." });
     }
@@ -25,21 +29,25 @@ export default class CalendarioController {
 
   static async previsualizarMes(req: Request, res: Response) {
     try {
-      const { anoMes } = req.query;
       const usuario = (req as any).usuario;
-      const idUsuario = Number(usuario?.id ?? 0);
+      const idUsuario = Number(usuario?.id);
 
+      if (!Number.isFinite(idUsuario)) {
+        return res.status(401).json({ mensagem: "Usuário não autenticado." });
+      }
+
+      const { anoMes } = req.query;
       const eventos = await Calendario.previsualizarEventosMes(
         idUsuario,
         anoMes as string,
       );
-      res.status(200).json(eventos);
+      return res.status(200).json(eventos);
     } catch (error) {
       logger.error(
         { error },
         "[CalendarioController] Erro ao previsualizar mês",
       );
-      res.status(500).json({ mensagem: "Erro interno ao previsualizar mês." });
+      return res.status(500).json({ mensagem: "Erro interno ao previsualizar mês." });
     }
   }
 

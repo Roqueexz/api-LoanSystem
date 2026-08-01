@@ -17,10 +17,25 @@ export default class Calendario {
         };
     }
 
+    private static async resolverFiltroEmprestimo(idUsuario: number): Promise<string> {
+        const resultado = await database.query(`
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'emprestimo'
+                  AND column_name = 'id_usuario'
+            ) AS possui_coluna
+        `);
+
+        return resultado.rows[0]?.possui_coluna ? `AND e.id_usuario = $3` : '';
+    }
+
     static async obterEventosCalendario(idUsuario: number, tipo?: string, data?: string): Promise<any[]> {
         try {
             const { inicio, fim } = this.montarRangeMes(data);
             const tipoEvento = tipo?.trim() || null;
+            const filtroEmprestimo = await this.resolverFiltroEmprestimo(idUsuario);
 
             const queryEventos = `
                 SELECT
@@ -34,18 +49,23 @@ export default class Calendario {
                     metadata
                 FROM (
                     SELECT
-                        'recebimento' AS tipo_evento,
+                        'parcela' AS tipo_evento,
                         TO_CHAR(p.data_vencimento, 'YYYY-MM-DD') AS data_evento,
                         p.valor_esperado::numeric AS valor,
                         CONCAT('Parcela ', p.numero_parcela, ' - ', 'Empréstimo #', e.id_emprestimo) AS descricao,
                         'blue' AS color,
                         'recebimento' AS categoria,
                         NULL AS prioridade,
-                        jsonb_build_object('id_parcela', p.id_parcela, 'numero_parcela', p.numero_parcela) AS metadata
+                        jsonb_build_object(
+                            'id_parcela', p.id_parcela,
+                            'numero_parcela', p.numero_parcela,
+                            'id_emprestimo', e.id_emprestimo
+                        ) AS metadata
                     FROM Parcela p
                     JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
                     WHERE p.data_vencimento BETWEEN $1 AND $2
                       AND e.status_emprestimo = TRUE
+                      ${filtroEmprestimo}
 
                     UNION ALL
 
@@ -109,6 +129,8 @@ export default class Calendario {
             const dataInicio = formatarDataISO(primeiroDia);
             const dataFim = formatarDataISO(ultimoDia);
 
+            const filtroEmprestimo = await this.resolverFiltroEmprestimo(idUsuario);
+
             const queryPrevisualizacao = `
                 SELECT
                     data_evento,
@@ -119,11 +141,12 @@ export default class Calendario {
                     SELECT
                         TO_CHAR(p.data_vencimento, 'YYYY-MM-DD') AS data_evento,
                         p.valor_esperado::numeric AS valor,
-                        'recebimento' AS tipo_evento
+                        'parcela' AS tipo_evento
                     FROM Parcela p
                     JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
                     WHERE p.data_vencimento BETWEEN $1 AND $2
                       AND e.status_emprestimo = TRUE
+                      ${filtroEmprestimo}
 
                     UNION ALL
 

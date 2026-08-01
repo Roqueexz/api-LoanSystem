@@ -208,6 +208,56 @@ CREATE INDEX IF NOT EXISTS idx_meta_usuario
     ON caixa_pessoal_meta(id_usuario);
 
 -- ============================================
+-- TABELAS DE NOTIFICAÇÕES
+-- ============================================
+CREATE TABLE IF NOT EXISTS notificacao_preferencia (
+    id_usuario       INT PRIMARY KEY,
+    notificacoes_conta BOOLEAN NOT NULL DEFAULT TRUE,
+    notificacoes_parcela BOOLEAN NOT NULL DEFAULT TRUE,
+    notificacoes_meta BOOLEAN NOT NULL DEFAULT TRUE,
+    notificacoes_sistema BOOLEAN NOT NULL DEFAULT TRUE,
+    push_enabled     BOOLEAN NOT NULL DEFAULT FALSE,
+    resumo_diario    BOOLEAN NOT NULL DEFAULT TRUE,
+    atualizada_em    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_notificacao_preferencia_usuario
+        FOREIGN KEY (id_usuario)
+        REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS notificacao (
+    id_notificacao   SERIAL PRIMARY KEY,
+    id_usuario       INT NOT NULL,
+    codigo           VARCHAR(120) NOT NULL,
+    titulo           VARCHAR(160) NOT NULL,
+    mensagem         TEXT NOT NULL,
+    tipo             VARCHAR(30) NOT NULL
+                     CHECK (tipo IN ('conta', 'parcela', 'meta', 'sistema', 'movimentacao')),
+    prioridade       VARCHAR(20) NOT NULL
+                     CHECK (prioridade IN ('critica', 'alta', 'media', 'baixa')),
+    canal            VARCHAR(20) NOT NULL DEFAULT 'in_app'
+                     CHECK (canal IN ('in_app', 'push', 'email', 'all')),
+    lida             BOOLEAN NOT NULL DEFAULT FALSE,
+    arquivada        BOOLEAN NOT NULL DEFAULT FALSE,
+    data_criacao     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_vencimento  DATE,
+    link             VARCHAR(255),
+
+    CONSTRAINT fk_notificacao_usuario
+        FOREIGN KEY (id_usuario)
+        REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_notificacao_codigo UNIQUE (id_usuario, codigo)
+);
+
+CREATE INDEX IF NOT EXISTS idx_notificacao_usuario
+    ON notificacao(id_usuario);
+CREATE INDEX IF NOT EXISTS idx_notificacao_prioridade
+    ON notificacao(prioridade);
+
+-- ============================================
 -- INSERTS DE TESTE: CLIENTES
 -- ============================================
 INSERT INTO Cliente (nome, sobrenome, telefone, cidade, estado, status_cliente) VALUES

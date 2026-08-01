@@ -11,6 +11,7 @@ import ParcelaController from "./controller/ParcelaController.js";
 import CaixaController from "./controller/CaixaController.js";
 import CaixaPessoalController from "./controller/CaixaPessoalController.js";
 import CalendarioController from "./controller/CalendarioController.js";
+import NotificacaoController from "./controller/NotificacaoController.js";
 import { AuthController } from "./controller/AuthController.js";
 
 import { validate } from "./middleware/Validation.js";
@@ -160,6 +161,35 @@ router.patch(
   "/api/calendario/regras",
   Auth.verifyToken,
   CalendarioController.atualizarRegra,
+);
+
+// ============================================
+// ROTAS DE NOTIFICAÇÕES
+// ============================================
+router.get(
+  "/api/notificacoes",
+  Auth.verifyToken,
+  NotificacaoController.listar,
+);
+router.get(
+  "/api/notificacoes/preferencias",
+  Auth.verifyToken,
+  NotificacaoController.preferencia,
+);
+router.patch(
+  "/api/notificacoes/preferencias",
+  Auth.verifyToken,
+  NotificacaoController.atualizarPreferencia,
+);
+router.patch(
+  "/api/notificacoes/:id/ler",
+  Auth.verifyToken,
+  NotificacaoController.marcarComoLida,
+);
+router.patch(
+  "/api/notificacoes/:id/arquivar",
+  Auth.verifyToken,
+  NotificacaoController.arquivar,
 );
 
 // ============================================

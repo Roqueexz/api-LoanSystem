@@ -13,6 +13,7 @@ import CaixaPessoalController from "./controller/CaixaPessoalController.js";
 import CalendarioController from "./controller/CalendarioController.js";
 import NotificacaoController from "./controller/NotificacaoController.js";
 import { AuthController } from "./controller/AuthController.js";
+import UsuarioController from "./controller/UsuarioController.js";
 
 import { validate } from "./middleware/Validation.js";
 import { ClienteSchema } from "./schemas/ClienteSchema.js";
@@ -20,6 +21,7 @@ import { EmprestimoSchema } from "./schemas/EmprestimoSchema.js";
 import { LoginSchema } from "./schemas/AuthSchema.js";
 import { ContaSchema } from "./schemas/ContaSchema.js";
 import { MetaSchema, MetaUpdateSchema } from "./schemas/MetaSchema.js";
+import { AtualizarPerfilSchema, AlterarSenhaSchema } from "./schemas/UsuarioSchema.js";
 
 const router = Router();
 const authController = new AuthController();
@@ -37,6 +39,24 @@ router.post(
   validate(LoginSchema),
   authController.login,
 );
+
+// ============================================
+// ROTAS DO PERFIL DO USUÁRIO
+// ============================================
+router.get("/api/usuario/perfil", Auth.verifyToken, UsuarioController.perfil);
+router.put(
+  "/api/usuario/perfil",
+  Auth.verifyToken,
+  validate(AtualizarPerfilSchema),
+  UsuarioController.atualizarPerfil,
+);
+router.patch(
+  "/api/usuario/senha",
+  Auth.verifyToken,
+  validate(AlterarSenhaSchema),
+  UsuarioController.alterarSenha,
+);
+router.get("/api/usuario/atividades", Auth.verifyToken, UsuarioController.atividades);
 
 // ============================================
 // ROTAS DE CLIENTES

@@ -375,7 +375,7 @@ Se existir uma escolha entre texto e interface visual, a interface visual deve s
 
 ## Sprint 11 — Nova Home (Dashboard Mobile Premium)
 
-**Status:** 🔄 Planejada
+**Status:** ✅ Concluída
 
 Objetivo:
 
@@ -417,27 +417,59 @@ O usuário deve abrir o aplicativo e entender sua situação financeira em menos
 
 ---
 
-## Sprint 12 — Refatoração Geral
+## Sprint 12 — Refatoração Geral & Melhoria UI/UX Mobile First
 
 **Status:** ⏳ Planejada
 
-Objetivo:
+### Objetivos Principais
 
-Validar toda a arquitetura construída até agora.
+Realizar uma refatoração profunda no **Frontend** e no **Backend**, garantindo UX Mobile First de ponta, segurança reforçada, alta velocidade de resposta e sincronização em tempo real de todas as movimentações financeiras.
 
-Revisar:
+---
 
-- componentes
-- hooks
-- DTOs
-- services
-- tipagens
-- organização das pastas
-- performance
-- responsividade
-- acessibilidade
+### 🎨 Frontend (Mobile-First Experience por Ordem de Prioridade)
 
-Nenhuma funcionalidade nova deverá ser criada nesta Sprint.
+Nenhuma funcionalidade nova será criada nesta Sprint; o foco é refatorar e aperfeiçoar a experiência móvel na seguinte fila estrita:
+
+1. **Fila 1 — Módulo de Empréstimos (`/emprestimos`)**:
+   - Refatoração dos cards de listagem de empréstimos para telas pequenas.
+   - Ações rápidas de 1 toque (Registrar Pagamento, Cobrar via WhatsApp, Ver Parcelas).
+   - Telas de detalhes e formulários otimizados para digitação rápida em teclado mobile.
+   - Indicadores visuais claros para parcelas atrasadas, pendentes e quitadas.
+
+2. **Fila 2 — Módulo de Clientes (`/clientes`)**:
+   - Redesign da lista de clientes em formato de cartões de contato mobile.
+   - Badges de status de adimplência/inadimplência do cliente.
+   - Ação rápida para criar novo empréstimo direto do perfil do cliente.
+   - Busca em tempo real e filtros responsivos por status.
+
+3. **Fila 3 — Módulo de Caixa Pessoal (`/caixa`)**:
+   - Atualização dinâmica instantânea dos resumos de caixa ao realizar qualquer operação.
+   - Modais responsivos e formulários rápidos para Entradas, Saídas e Pagamento de Contas.
+   - Organização visual por abas acessíveis (Extrato, Contas a Pagar/Receber, Cofre Digital, Metas).
+
+4. **Fila 4 — Demais Funcionalidades (Dashboard, Calendário, Notificações, Perfil)**:
+   - Ajustes de layout, responsividade e componentes reutilizáveis.
+   - Padronização de hooks e eliminação de código legado/duplicado.
+
+---
+
+### ⚡ Backend (Segurança, Performance & Central de Movimentações)
+
+1. **Segurança Reforçada**:
+   - Validação rigorosa de JWT em 100% dos endpoints.
+   - Schema validation via Zod no corpo, params e query params.
+   - Garantia de isolamento total de dados por usuário (`id_usuario`).
+
+2. **Performance & Rapidez da API**:
+   - Otimização das queries de cálculo de resumo financeiro (`GET /caixa`, saldos, entradas e saídas).
+   - Indexação adequada das tabelas no PostgreSQL.
+   - Respostas ultrarrápidas (< 50ms) para atualização visual em tempo real no app.
+
+3. **Arquitetura Event-Driven & Central Única de Movimentações**:
+   - Centralização do registro automático de movimentações financeiras.
+   - **Regra Fundamental**: Qualquer ação no sistema (pagamento de parcela de empréstimo, pagamento de conta, entrada/saída de caixa) gera automaticamente um registro na Central de Movimentações do Dia.
+   - Garantia de dinamismo 100% no feed e no saldo do usuário.
 
 ---
 

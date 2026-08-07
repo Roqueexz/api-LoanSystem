@@ -240,4 +240,35 @@ router.patch(
   Auth.verifyToken,
   CaixaPessoalController.pagarConta,
 );
+router.delete(
+  "/api/caixa-pessoal/contas/:id",
+  Auth.verifyToken,
+  CaixaPessoalController.removerConta,
+);
+
+// Sprint 5: Metas Financeiras
+router.get(
+  "/api/caixa-pessoal/metas",
+  Auth.verifyToken,
+  CaixaPessoalController.listarMetas,
+);
+router.post(
+  "/api/caixa-pessoal/metas",
+  Auth.verifyToken,
+  validate(MetaSchema),
+  CaixaPessoalController.criarMeta,
+);
+router.put(
+  "/api/caixa-pessoal/metas/:id",
+  Auth.verifyToken,
+  validate(MetaUpdateSchema),
+  CaixaPessoalController.atualizarMeta,
+);
+router.delete(
+  "/api/caixa-pessoal/metas/:id",
+  Auth.verifyToken,
+  CaixaPessoalController.removerMeta,
+);
+
 export { router };
+

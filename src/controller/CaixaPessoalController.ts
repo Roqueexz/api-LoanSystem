@@ -299,7 +299,14 @@ export default class CaixaPessoalController {
     static async criarMeta(req: Request, res: Response): Promise<any> {
         try {
             const { id } = (req as any).usuario;
-            const { nome, descricao, valor_alvo, valor_atual, prazo } = req.body;
+            const nome = req.body.nome;
+            const descricao = req.body.descricao;
+            const valor_alvo = Number(req.body.valor_alvo ?? req.body.valorAlvo);
+            const valor_atual = req.body.valor_atual !== undefined
+                ? Number(req.body.valor_atual)
+                : (req.body.valorAtual !== undefined ? Number(req.body.valorAtual) : 0);
+            const prazo = req.body.prazo;
+
             const meta = await CaixaPessoal.criarMeta(Number(id), {
                 nome,
                 descricao,
@@ -319,19 +326,29 @@ export default class CaixaPessoalController {
         try {
             const { id } = (req as any).usuario;
             const id_meta = Number(req.params.id);
-            const { nome, descricao, valor_alvo, valor_atual, prazo } = req.body;
 
             if (isNaN(id_meta) || id_meta <= 0) {
                 return res.status(400).json({ mensagem: 'ID da meta inválido.' });
             }
 
-            const meta = await CaixaPessoal.atualizarMeta(Number(id), id_meta, {
-                nome,
-                descricao,
-                valor_alvo,
-                valor_atual,
-                prazo,
-            });
+            const nome = req.body.nome;
+            const descricao = req.body.descricao;
+            const valor_alvo = req.body.valor_alvo !== undefined
+                ? Number(req.body.valor_alvo)
+                : (req.body.valorAlvo !== undefined ? Number(req.body.valorAlvo) : undefined);
+            const valor_atual = req.body.valor_atual !== undefined
+                ? Number(req.body.valor_atual)
+                : (req.body.valorAtual !== undefined ? Number(req.body.valorAtual) : undefined);
+            const prazo = req.body.prazo;
+
+            const payload: any = {};
+            if (nome !== undefined) payload.nome = String(nome);
+            if (descricao !== undefined) payload.descricao = String(descricao);
+            if (valor_alvo !== undefined) payload.valor_alvo = valor_alvo;
+            if (valor_atual !== undefined) payload.valor_atual = valor_atual;
+            if (prazo !== undefined) payload.prazo = String(prazo);
+
+            const meta = await CaixaPessoal.atualizarMeta(Number(id), id_meta, payload);
 
             if (!meta) {
                 return res.status(404).json({ mensagem: 'Meta não encontrada ou não pertence ao usuário.' });

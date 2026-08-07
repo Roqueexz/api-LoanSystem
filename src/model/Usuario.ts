@@ -180,4 +180,128 @@ export default class Usuario {
       throw error;
     }
   }
+
+  /**
+   * Atualiza nome e/ou email do usuário
+   */
+  static async atualizar(id_usuario: number, dados: { nome?: string; email?: string }): Promise<UsuarioDTO | null> {
+    try {
+      const setClauses: string[] = [];
+      const valores: any[] = [];
+      let idx = 1;
+
+      if (dados.nome) {
+        setClauses.push(`nome = $${idx++}`);
+        valores.push(capitalizar(dados.nome));
+      }
+      if (dados.email) {
+        Usuario.validarEmail(dados.email);
+        setClauses.push(`email = $${idx++}`);
+        valores.push(dados.email.toLowerCase().trim());
+      }
+
+      if (setClauses.length === 0) return null;
+
+      valores.push(id_usuario);
+      const query = `UPDATE usuario SET ${setClauses.join(', ')} WHERE id_usuario = $${idx} RETURNING id_usuario, nome, email, role, criado_em`;
+      const res = await database.query(query, valores);
+
+      if (res.rows.length === 0) return null;
+      const row = res.rows[0];
+      return {
+        id_usuario: row.id_usuario,
+        nome: row.nome,
+        email: row.email,
+        senha: '',
+        role: row.role,
+        criado_em: row.criado_em,
+      };
+    } catch (error) {
+      console.error(`[UsuarioModel] Erro ao atualizar usuario:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Altera a senha do usuário validando a senha atual
+   */
+  static async alterarSenha(id_usuario: number, senhaAtual: string, novaSenha: string): Promise<boolean> {
+    try {
+      const query = `SELECT senha FROM usuario WHERE id_usuario = $1`;
+      const res = await database.query(query, [id_usuario]);
+
+      if (res.rows.length === 0) return false;
+
+      const senhaHash = res.rows[0].senha;
+      const senhaValida = await bcrypt.compare(senhaAtual, senhaHash) ||
+        senhaHash === senhaAtual; // suporte a senhas legadas
+
+      if (!senhaValida) return false;
+
+      const saltRounds = 10;
+      const novaHash = await bcrypt.hash(novaSenha, saltRounds);
+      await database.query(`UPDATE usuario SET senha = $1 WHERE id_usuario = $2`, [novaHash, id_usuario]);
+      return true;
+    } catch (error) {
+      console.error(`[UsuarioModel] Erro ao alterar senha:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Retorna as últimas atividades reais do usuário
+   * (clientes cadastrados, empréstimos, movimentações de caixa)
+   */
+  static async atividades(id_usuario: number, limite: number = 20): Promise<Array<{
+    tipo: string;
+    descricao: string;
+    detalhe: string;
+    criado_em: Date;
+  }>> {
+    try {
+      const query = `
+        SELECT tipo, descricao, detalhe, criado_em FROM (
+          -- Clientes cadastrados
+          SELECT
+            'cliente' AS tipo,
+            'Cliente cadastrado' AS descricao,
+            nome AS detalhe,
+            criado_em
+          FROM cliente
+          WHERE id_usuario = $1
+
+          UNION ALL
+
+          -- Empréstimos registrados
+          SELECT
+            'emprestimo' AS tipo,
+            'Empréstimo registrado' AS descricao,
+            CONCAT(c.nome, ' — R$ ', TO_CHAR(e.valor, 'FM999G999G990D00')) AS detalhe,
+            e.criado_em
+          FROM emprestimo e
+          JOIN cliente c ON c.id_cliente = e.id_cliente
+          WHERE e.id_usuario = $1
+
+          UNION ALL
+
+          -- Movimentações do caixa pessoal
+          SELECT
+            CASE WHEN tipo = 'entrada' THEN 'recebimento' ELSE 'saida' END AS tipo,
+            CASE WHEN tipo = 'entrada' THEN 'Recebimento registrado' ELSE 'Saída registrada' END AS descricao,
+            CONCAT(descricao, ' — R$ ', TO_CHAR(valor, 'FM999G999G990D00')) AS detalhe,
+            criado_em
+          FROM movimentacao_caixa_pessoal
+          WHERE id_usuario = $1
+        ) atividades
+        ORDER BY criado_em DESC
+        LIMIT $2
+      `;
+
+      const res = await database.query(query, [id_usuario, limite]);
+      return res.rows;
+    } catch (error) {
+      console.error(`[UsuarioModel] Erro ao buscar atividades:`, error);
+      throw error;
+    }
+  }
 }

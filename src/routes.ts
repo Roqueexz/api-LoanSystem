@@ -3,6 +3,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 
 import { Auth } from "./middleware/Auth.js";
+import { upload } from "./middleware/upload.js";
 import { loginLimiter } from "./middleware/RateLimiter.js";
 
 import ClienteController from "./controller/ClienteController.js";
@@ -57,6 +58,7 @@ router.patch(
   UsuarioController.alterarSenha,
 );
 router.get("/api/usuario/atividades", Auth.verifyToken, UsuarioController.atividades);
+router.put("/api/usuario/avatar", Auth.verifyToken, upload.single('avatar'), UsuarioController.uploadAvatar);
 
 // ============================================
 // ROTAS DE CLIENTES

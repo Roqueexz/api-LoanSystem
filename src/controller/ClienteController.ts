@@ -70,10 +70,13 @@ export default class ClienteController {
         return;
       }
 
+      // Remove máscara do telefone (ex: (11) 99999-9999 → 11999999999)
+      const telefone = (dadosRecebidos.telefone || "").replace(/\D/g, '');
+
       const novoCliente = new Cliente(
         nome,
         sobrenome,
-        dadosRecebidos.telefone || "",
+        telefone,
         dadosRecebidos.cidade || "",
         dadosRecebidos.estado || "",
         dadosRecebidos.criado_em ? new Date(dadosRecebidos.criado_em) : new Date()
@@ -110,10 +113,13 @@ export default class ClienteController {
       const nome = dadosRecebidos.nome_cliente || dadosRecebidos.nome || "";
       const sobrenome = dadosRecebidos.sobrenome_cliente || dadosRecebidos.sobrenome || "";
 
+      // Remove máscara do telefone
+      const telefone = (dadosRecebidos.telefone || "").replace(/\D/g, '');
+
       const cliente = new Cliente(
         nome,
         sobrenome,
-        dadosRecebidos.telefone || "",
+        telefone,
         dadosRecebidos.cidade || "",
         dadosRecebidos.estado || "",
         dadosRecebidos.criado_em ? new Date(dadosRecebidos.criado_em) : new Date()

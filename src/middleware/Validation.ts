@@ -2,7 +2,8 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import { z, ZodError } from 'zod';
 
-export const validate = (schema: z.ZodObject<any, any>) => {
+// Aceita ZodObject, ZodEffects (após .refine()/.transform()) e qualquer ZodType
+export const validate = (schema: z.ZodTypeAny) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       await schema.parseAsync(req.body);
@@ -13,8 +14,9 @@ export const validate = (schema: z.ZodObject<any, any>) => {
           campo: issue.path.join('.'),
           mensagem: issue.message,
         }));
+        const detalhe = errors.map((e) => e.mensagem).join("; ");
         res.status(400).json({
-          mensagem: "Dados invalidos",
+          mensagem: detalhe || "Dados inválidos",
           errors,
         });
         return;

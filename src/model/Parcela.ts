@@ -209,11 +209,23 @@ export default class Parcela {
     }
   }
 
-  static async marcarComoPaga(id_parcela: number, data_pagamento?: Date): Promise<boolean> {
+  static async marcarComoPaga(id_parcela: number, data_pagamento?: Date, id_usuario: number = 1): Promise<boolean> {
     const client = await database.connect();
 
     try {
       await client.query('BEGIN');
+
+      // Busca dados da parcela e cliente para o histórico de movimentações
+      const infoRes = await client.query(
+        `SELECT p.numero_parcela, p.valor_esperado, e.id_emprestimo, e.num_parcelas, c.nome, c.sobrenome
+         FROM Parcela p
+         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+         JOIN Cliente c ON e.id_cliente = c.id_cliente
+         WHERE p.id_parcela = $1`,
+        [id_parcela]
+      );
+
+      const dtPagto = data_pagamento ?? new Date();
 
       const atualizarParcela = `
         UPDATE Parcela
@@ -226,7 +238,7 @@ export default class Parcela {
 
       const updateRes = await client.query(atualizarParcela, [
         id_parcela,
-        data_pagamento ?? new Date(),
+        dtPagto,
       ]);
 
       if ((updateRes.rowCount ?? 0) === 0) {
@@ -235,6 +247,19 @@ export default class Parcela {
       }
 
       const id_emprestimo = updateRes.rows[0].id_emprestimo;
+
+      // Inserir registro de ENTRADA no Caixa Pessoal / Central de Movimentações
+      if (infoRes.rows.length > 0) {
+        const info = infoRes.rows[0];
+        const nomeCliente = `${info.nome} ${info.sobrenome}`;
+        const desc = `Recebimento da Parcela ${info.numero_parcela}/${info.num_parcelas} do Empréstimo #${id_emprestimo} - ${nomeCliente}`;
+
+        await client.query(
+          `INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)
+           VALUES ($1, 'entrada', $2, 'Empréstimo - Recebimento', $3, $4)`,
+          [id_usuario, Number(info.valor_esperado), desc, dtPagto]
+        );
+      }
 
       const parcelasNaoPagas = await client.query(
         `SELECT COUNT(*)::int AS total
@@ -261,11 +286,20 @@ export default class Parcela {
     }
   }
 
-  static async desfazerPagamento(id_parcela: number): Promise<boolean> {
+  static async desfazerPagamento(id_parcela: number, id_usuario: number = 1): Promise<boolean> {
     const client = await database.connect();
 
     try {
       await client.query('BEGIN');
+
+      const infoRes = await client.query(
+        `SELECT p.numero_parcela, p.valor_esperado, e.id_emprestimo, c.nome, c.sobrenome
+         FROM Parcela p
+         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+         JOIN Cliente c ON e.id_cliente = c.id_cliente
+         WHERE p.id_parcela = $1`,
+        [id_parcela]
+      );
 
       const query = `
         UPDATE Parcela
@@ -287,6 +321,19 @@ export default class Parcela {
         `UPDATE Emprestimo SET status_emprestimo = TRUE WHERE id_emprestimo = $1`,
         [id_emprestimo]
       );
+
+      // Inserir registro de SAÍDA (Estorno) no Caixa Pessoal
+      if (infoRes.rows.length > 0) {
+        const info = infoRes.rows[0];
+        const nomeCliente = `${info.nome} ${info.sobrenome}`;
+        const desc = `Estorno da Parcela ${info.numero_parcela} do Empréstimo #${id_emprestimo} - ${nomeCliente}`;
+
+        await client.query(
+          `INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)
+           VALUES ($1, 'saida', $2, 'Estorno de Recebimento', $3, CURRENT_DATE)`,
+          [id_usuario, Number(info.valor_esperado), desc]
+        );
+      }
 
       await client.query('COMMIT');
       return true;

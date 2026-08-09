@@ -168,7 +168,7 @@ export default class Emprestimo {
     }
   }
 
-  static async cadastrarEmprestimo(emprestimo: Emprestimo): Promise<number> {
+  static async cadastrarEmprestimo(emprestimo: Emprestimo, id_usuario: number = 1): Promise<number> {
     const client = await database.connect();
 
     try {
@@ -224,8 +224,26 @@ export default class Emprestimo {
       const input = Emprestimo.toParcelaInput(emprestimo, id_emprestimo);
       await Parcela.gerarParcelas(input, client);
 
+      // Registrar movimentação de SAÍDA no Caixa Pessoal
+      const cliRes = await client.query(
+        `SELECT nome, sobrenome FROM Cliente WHERE id_cliente = $1`,
+        [emprestimo.getIdCliente()]
+      );
+      const nomeCli = cliRes.rows[0] ? `${cliRes.rows[0].nome} ${cliRes.rows[0].sobrenome}` : `Cliente #${emprestimo.getIdCliente()}`;
+
+      await client.query(
+        `INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)
+         VALUES ($1, 'saida', $2, 'Empréstimo Concedido', $3, $4)`,
+        [
+          id_usuario,
+          emprestimo.getValorEmprestimo(),
+          `Empréstimo concedido a ${nomeCli} (#${id_emprestimo})`,
+          emprestimo.getDataEmprestimo(),
+        ]
+      );
+
       await client.query('COMMIT');
-      console.info(`[EmprestimoModel] Emprestimo cadastrado com parcelas. ID: ${id_emprestimo}`);
+      console.info(`[EmprestimoModel] Emprestimo cadastrado com parcelas e movimentação de caixa. ID: ${id_emprestimo}`);
       return id_emprestimo;
     } catch (error) {
       await client.query('ROLLBACK');

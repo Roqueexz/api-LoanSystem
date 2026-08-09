@@ -258,23 +258,45 @@ export default class Emprestimo {
     const client = await database.connect();
 
     try {
+      // Verifica o status atual do empréstimo
+      const empRes = await client.query(
+        `SELECT status_emprestimo FROM Emprestimo WHERE id_emprestimo = $1`,
+        [id_emprestimo]
+      );
+
+      if (empRes.rows.length === 0) {
+        return false;
+      }
+
+      const isQuitado = empRes.rows[0].status_emprestimo === false;
+
+      if (isQuitado) {
+        // Empréstimo quitado: pode excluir fisicamente tudo
+        await client.query('BEGIN');
+        await client.query(`DELETE FROM Parcela WHERE id_emprestimo = $1`, [id_emprestimo]);
+        const res = await client.query(
+          `DELETE FROM Emprestimo WHERE id_emprestimo = $1`,
+          [id_emprestimo]
+        );
+        await client.query('COMMIT');
+        return (res.rowCount ?? 0) > 0;
+      }
+
+      // Empréstimo ativo: bloqueia se tiver parcelas pagas
       const pagas = await Parcela.contarPagas(id_emprestimo, client);
       if (pagas > 0) {
         throw new Error(
-          `Nao e possivel inativar emprestimo com ${pagas} parcela(s) paga(s). ` +
-          `Para remover, primeiro desfaca os pagamentos.`
+          `Não é possível excluir um empréstimo com ${pagas} parcela(s) já paga(s). ` +
+          `Para remover, primeiro desfaça os pagamentos ou liquide o contrato.`
         );
       }
 
       await client.query('BEGIN');
-
       await Parcela.excluirParcelasPendentes(id_emprestimo, client);
-
       const res = await client.query(
-        `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_emprestimo = $1`,
+        `DELETE FROM Emprestimo WHERE id_emprestimo = $1`,
         [id_emprestimo],
       );
-
       await client.query('COMMIT');
       return (res.rowCount ?? 0) > 0;
     } catch (error) {

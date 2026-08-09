@@ -106,7 +106,8 @@ export default class EmprestimoController {
     } catch (error: any) {
       logger.error({ error, id: req.params.id }, "[EmprestimoController] Erro ao remover emprestimo");
       
-      if (error.message?.includes("parcelas pagas")) {
+      // Erros de regra de negócio (parcelas pagas, etc.) retornam 400
+      if (error.message?.includes("parcela")) {
         res.status(400).json({ mensagem: error.message });
         return;
       }

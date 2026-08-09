@@ -69,7 +69,8 @@ export default class EmprestimoController {
         dados.forma_pagamento ?? null,
       );
 
-      const result = await Emprestimo.cadastrarEmprestimo(novo);
+      const idUsuario = (req as any).usuario?.id ? Number((req as any).usuario.id) : 1;
+      const result = await Emprestimo.cadastrarEmprestimo(novo, idUsuario);
       if (result) {
         res.status(201).json({ mensagem: "Emprestimo cadastrado com sucesso." });
       } else {

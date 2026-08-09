@@ -11,6 +11,7 @@ export interface UsuarioDTO {
   senha: string;
   role: string;
   criado_em: Date;
+  avatar_url?: string | null;
 }
 
 export default class Usuario {
@@ -20,6 +21,7 @@ export default class Usuario {
   private senha: string;
   private role: string;
   private criado_em: Date;
+  private avatar_url?: string | null;
 
   constructor(
     _nome: string,
@@ -37,6 +39,8 @@ export default class Usuario {
 
   public getIdUsuario(): number { return this.id_usuario; }
   public setIdUsuario(id: number): void { this.id_usuario = id; }
+  public getAvatarUrl(): string | null | undefined { return this.avatar_url; }
+  public setAvatarUrl(url: string | null): void { this.avatar_url = url; }
   public getNome(): string { return this.nome; }
   public setNome(nome: string): void { this.nome = capitalizar(nome); }
   public getEmail(): string { return this.email; }
@@ -55,7 +59,8 @@ export default class Usuario {
       email: row.email,
       senha: row.senha,
       role: row.role,
-      criado_em: row.criado_em,
+      criado_em: row.created_em ?? row.criado_em,
+      avatar_url: row.avatar_url ?? null,
     };
   }
 
@@ -203,7 +208,7 @@ export default class Usuario {
       if (setClauses.length === 0) return null;
 
       valores.push(id_usuario);
-      const query = `UPDATE usuario SET ${setClauses.join(', ')} WHERE id_usuario = $${idx} RETURNING id_usuario, nome, email, role, criado_em`;
+      const query = `UPDATE usuario SET ${setClauses.join(', ')} WHERE id_usuario = $${idx} RETURNING id_usuario, nome, email, role, criado_em, avatar_url`;
       const res = await database.query(query, valores);
 
       if (res.rows.length === 0) return null;
@@ -215,9 +220,31 @@ export default class Usuario {
         senha: '',
         role: row.role,
         criado_em: row.criado_em,
+        avatar_url: row.avatar_url ?? null,
       };
     } catch (error) {
       console.error(`[UsuarioModel] Erro ao atualizar usuario:`, error);
+      throw error;
+    }
+  }
+
+  static async atualizarAvatarUrl(id_usuario: number, avatar_url: string | null): Promise<UsuarioDTO | null> {
+    try {
+      const query = `UPDATE usuario SET avatar_url = $2 WHERE id_usuario = $1 RETURNING id_usuario, nome, email, role, criado_em, avatar_url`;
+      const res = await database.query(query, [id_usuario, avatar_url]);
+      if (res.rows.length === 0) return null;
+      const row = res.rows[0];
+      return {
+        id_usuario: row.id_usuario,
+        nome: row.nome,
+        email: row.email,
+        senha: '',
+        role: row.role,
+        criado_em: row.criado_em,
+        avatar_url: row.avatar_url ?? null,
+      };
+    } catch (error) {
+      console.error(`[UsuarioModel] Erro ao atualizar avatar_url:`, error);
       throw error;
     }
   }

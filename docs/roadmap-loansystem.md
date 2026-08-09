@@ -419,7 +419,7 @@ O usuário deve abrir o aplicativo e entender sua situação financeira em menos
 
 ## Sprint 12 — Refatoração Geral & Melhoria UI/UX Mobile First
 
-**Status:** ⏳ Planejada
+**Status:** 🔄 Em Andamento
 
 ### Objetivos Principais
 
@@ -431,11 +431,16 @@ Realizar uma refatoração profunda no **Frontend** e no **Backend**, garantindo
 
 Nenhuma funcionalidade nova será criada nesta Sprint; o foco é refatorar e aperfeiçoar a experiência móvel na seguinte fila estrita:
 
-1. **Fila 1 — Módulo de Empréstimos (`/emprestimos`)**:
+1. **Fila 1 — Módulo de Empréstimos (`/emprestimos`)**: ✅ Concluída
    - Refatoração dos cards de listagem de empréstimos para telas pequenas.
    - Ações rápidas de 1 toque (Registrar Pagamento, Cobrar via WhatsApp, Ver Parcelas).
    - Telas de detalhes e formulários otimizados para digitação rápida em teclado mobile.
    - Indicadores visuais claros para parcelas atrasadas, pendentes e quitadas.
+   - Clique no card para navegar diretamente para detalhes do empréstimo.
+   - Aba "Histórico (Liquidados)" para visualizar contratos quitados.
+   - Barra de progresso sincronizada com `num_parcelas` do contrato.
+   - Seleção visual de cliente com `ModalSeletor` reutilizável (busca, avatar, 1 toque).
+   - Sincronismo automático com Caixa Pessoal: saída ao criar, entrada ao baixar parcela, estorno ao desfazer.
 
 2. **Fila 2 — Módulo de Clientes (`/clientes`)**:
    - Redesign da lista de clientes em formato de cartões de contato mobile.
@@ -466,10 +471,11 @@ Nenhuma funcionalidade nova será criada nesta Sprint; o foco é refatorar e ape
    - Indexação adequada das tabelas no PostgreSQL.
    - Respostas ultrarrápidas (< 50ms) para atualização visual em tempo real no app.
 
-3. **Arquitetura Event-Driven & Central Única de Movimentações**:
+3. **Arquitetura Event-Driven & Central Única de Movimentações**: ✅ Concluído (Fila 1)
    - Centralização do registro automático de movimentações financeiras.
    - **Regra Fundamental**: Qualquer ação no sistema (pagamento de parcela de empréstimo, pagamento de conta, entrada/saída de caixa) gera automaticamente um registro na Central de Movimentações do Dia.
    - Garantia de dinamismo 100% no feed e no saldo do usuário.
+   - `id_usuario` extraído exclusivamente do JWT em 100% das operações de empréstimo e parcela.
 
 ---
 

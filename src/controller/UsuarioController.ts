@@ -1,6 +1,8 @@
 import { type Request, type Response } from 'express';
 import Usuario from '../model/Usuario.js';
 import logger from '../services/Logger.js';
+import path from 'path';
+import { upload, processImage } from '../middleware/upload.js';
 
 interface JwtPayload {
   id: number;
@@ -110,6 +112,35 @@ export class UsuarioController {
       res.status(200).json({ atividades: dados });
     } catch (error) {
       logger.error({ error }, '[UsuarioController] Erro ao buscar atividades');
+      res.status(500).json({ mensagem: 'Erro interno do servidor.' });
+    }
+  }
+  /**
+   * PUT /api/usuario/avatar
+   * Atualiza a foto de avatar do usuário autenticado.
+   */
+  async uploadAvatar(req: Request, res: Response): Promise<void> {
+    try {
+      const payload = (req as any).usuario as JwtPayload;
+      // multer middleware should have parsed the file
+      if (!req.file) {
+        res.status(400).json({ mensagem: 'Arquivo de avatar não fornecido.' });
+        return;
+      }
+      // Process image (resize, convert to WebP)
+      const processedPath = await processImage(req.file.path);
+      // Build URL relative to public folder
+      const filename = path.basename(processedPath);
+      const avatarUrl = `/uploads/${filename}`;
+      const atualizado = await Usuario.atualizarAvatarUrl(payload.id, avatarUrl);
+      if (!atualizado) {
+        res.status(500).json({ mensagem: 'Falha ao atualizar avatar.' });
+        return;
+      }
+      logger.info({ userId: payload.id }, '[UsuarioController] Avatar atualizado');
+      res.status(200).json({ mensagem: 'Avatar atualizado com sucesso.', avatar_url: avatarUrl });
+    } catch (error) {
+      logger.error({ error }, '[UsuarioController] Erro ao fazer upload de avatar');
       res.status(500).json({ mensagem: 'Erro interno do servidor.' });
     }
   }

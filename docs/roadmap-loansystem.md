@@ -442,11 +442,12 @@ Nenhuma funcionalidade nova será criada nesta Sprint; o foco é refatorar e ape
    - Seleção visual de cliente com `ModalSeletor` reutilizável (busca, avatar, 1 toque).
    - Sincronismo automático com Caixa Pessoal: saída ao criar, entrada ao baixar parcela, estorno ao desfazer.
 
-2. **Fila 2 — Módulo de Clientes (`/clientes`)**:
-   - Redesign da lista de clientes em formato de cartões de contato mobile.
-   - Badges de status de adimplência/inadimplência do cliente.
-   - Ação rápida para criar novo empréstimo direto do perfil do cliente.
-   - Busca em tempo real e filtros responsivos por status.
+2. **Fila 2 — Módulo de Clientes (`/clientes`)**: ✅ Concluída
+   - Redesign da lista de clientes em formato de cartões de contato mobile (grid responsivo).
+   - Badges de status de adimplência/inadimplência (`ADIMPLENTE`, `INADIMPLENTE`, `SEM CONTRATO`).
+   - Atalho de 1 toque para criar novo empréstimo direto do card ou perfil do cliente (`/emprestimos/novo?clienteId=ID`).
+   - Atalho de 1 toque para contato via WhatsApp direto no card/perfil.
+   - Busca em tempo real e chips de filtro por status (`TODOS`, `ADIMPLENTES`, `INADIMPLENTES`, `SEM CONTRATO`).
 
 3. **Fila 3 — Módulo de Caixa Pessoal (`/caixa`)**:
    - Atualização dinâmica instantânea dos resumos de caixa ao realizar qualquer operação.

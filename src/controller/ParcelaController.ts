@@ -65,7 +65,8 @@ export default class ParcelaController {
         ? new Date(req.body.data_pagamento)
         : undefined;
 
-      const result = await Parcela.marcarComoPaga(id_parcela, dataPagamento);
+      const idUsuario = (req as any).usuario?.id ? Number((req as any).usuario.id) : 1;
+      const result = await Parcela.marcarComoPaga(id_parcela, dataPagamento, idUsuario);
 
       if (result) {
         res.status(200).json({ mensagem: "Parcela paga com sucesso." });
@@ -87,7 +88,8 @@ export default class ParcelaController {
         return;
       }
 
-      const result = await Parcela.desfazerPagamento(id_parcela);
+      const idUsuario = (req as any).usuario?.id ? Number((req as any).usuario.id) : 1;
+      const result = await Parcela.desfazerPagamento(id_parcela, idUsuario);
 
       if (result) {
         res.status(200).json({ mensagem: "Pagamento desfeito com sucesso." });

@@ -128,7 +128,7 @@ export default class Cliente {
     };
   }
 
-  static async cadastrarCliente(cliente: Cliente): Promise<boolean> {
+  static async cadastrarCliente(cliente: Cliente): Promise<number> {
     try {
       const queryInsertCliente = `
         INSERT INTO Cliente (nome, sobrenome, telefone, cidade, estado, criado_em)
@@ -150,8 +150,9 @@ export default class Cliente {
         throw new Error("INSERT não retornou ID — cadastro pode ter falhado silenciosamente.");
       }
 
-      console.info(`[ClienteModel] Cliente cadastrado com sucesso. ID: ${result.rows[0].id_cliente}`);
-      return true;
+      const id_cliente = result.rows[0].id_cliente as number;
+      console.info(`[ClienteModel] Cliente cadastrado com sucesso. ID: ${id_cliente}`);
+      return id_cliente;
     } catch (error) {
       console.error(`[ClienteModel] Erro ao cadastrar cliente:`, error);
       throw error;

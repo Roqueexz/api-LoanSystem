@@ -58,24 +58,31 @@ export default class ClienteController {
 
   static async cadastrar(req: Request, res: Response) {
     try {
-          console.log('[ClienteController] Requisicao recebida em /api/clientes');
-          console.log('[ClienteController] Body:', req.body);
-          console.log('[ClienteController] Headers:', req.headers);
+      console.log('[ClienteController] Requisicao recebida em /api/clientes');
+      console.log('[ClienteController] Body:', req.body);
       const dadosRecebidos = req.body;
 
+      const nome = dadosRecebidos.nome_cliente || dadosRecebidos.nome || "";
+      const sobrenome = dadosRecebidos.sobrenome_cliente || dadosRecebidos.sobrenome || "";
+
+      if (!nome.trim()) {
+        res.status(400).json({ mensagem: "Nome do cliente e obrigatorio." });
+        return;
+      }
+
       const novoCliente = new Cliente(
-        dadosRecebidos.nome,
-        dadosRecebidos.sobrenome,
-        dadosRecebidos.telefone,
-        dadosRecebidos.cidade,
-        dadosRecebidos.estado,
+        nome,
+        sobrenome,
+        dadosRecebidos.telefone || "",
+        dadosRecebidos.cidade || "",
+        dadosRecebidos.estado || "",
         dadosRecebidos.criado_em ? new Date(dadosRecebidos.criado_em) : new Date()
       );
 
-      const result = await Cliente.cadastrarCliente(novoCliente);
+      const id_cliente = await Cliente.cadastrarCliente(novoCliente);
 
-      if (result) {
-        res.status(201).json({ mensagem: "Cliente cadastrado com sucesso." });
+      if (id_cliente) {
+        res.status(201).json({ mensagem: "Cliente cadastrado com sucesso.", id_cliente });
       } else {
         res.status(400).json({ mensagem: "Nao foi possivel cadastrar o cliente." });
       }
@@ -100,12 +107,15 @@ export default class ClienteController {
 
       const dadosRecebidos = req.body;
 
+      const nome = dadosRecebidos.nome_cliente || dadosRecebidos.nome || "";
+      const sobrenome = dadosRecebidos.sobrenome_cliente || dadosRecebidos.sobrenome || "";
+
       const cliente = new Cliente(
-        dadosRecebidos.nome,
-        dadosRecebidos.sobrenome,
-        dadosRecebidos.telefone,
-        dadosRecebidos.cidade,
-        dadosRecebidos.estado,
+        nome,
+        sobrenome,
+        dadosRecebidos.telefone || "",
+        dadosRecebidos.cidade || "",
+        dadosRecebidos.estado || "",
         dadosRecebidos.criado_em ? new Date(dadosRecebidos.criado_em) : new Date()
       );
 

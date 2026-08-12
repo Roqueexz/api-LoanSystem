@@ -12,6 +12,7 @@
 -- DROP TABLES
 -- A ordem importa: tabelas dependentes primeiro.
 -- ============================================
+DROP TABLE IF EXISTS caixinha_pessoal CASCADE;
 DROP TABLE IF EXISTS notificacao CASCADE;
 DROP TABLE IF EXISTS notificacao_preferencia CASCADE;
 DROP TABLE IF EXISTS caixa_pessoal_meta CASCADE;
@@ -35,8 +36,9 @@ CREATE TABLE IF NOT EXISTS usuario (
     nome        VARCHAR(80)  NOT NULL,
     email       VARCHAR(100) UNIQUE NOT NULL,
     senha       VARCHAR(255) NOT NULL,
-    role        VARCHAR(20)  NOT NULL DEFAULT 'admin',
+    role        VARCHAR(20)  NOT NULL DEFAULT 'credor',
     avatar_url  VARCHAR(500) NULL,            -- Sprint 12: foto de perfil (URL local ou CDN)
+    ativo       BOOLEAN      NOT NULL DEFAULT TRUE, -- Sprint 13: status ativo/suspenso
     criado_em   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -254,6 +256,32 @@ CREATE INDEX IF NOT EXISTS idx_meta_usuario ON caixa_pessoal_meta(id_usuario);
 
 
 -- ============================================
+-- TABELA CAIXA PESSOAL — CAIXINHAS (ESTILO NUBANK)
+-- Sprint 13: caixinhas de objetivos pessoais.
+-- ============================================
+CREATE TABLE IF NOT EXISTS caixinha_pessoal (
+    id_caixinha  SERIAL PRIMARY KEY,
+    id_usuario   INT           NOT NULL,
+    nome         VARCHAR(80)   NOT NULL,
+    saldo        NUMERIC(10,2) NOT NULL DEFAULT 0.00 CHECK (saldo >= 0),
+    meta         NUMERIC(10,2)          CHECK (meta > 0),
+    emoji        VARCHAR(10)            DEFAULT '🐷',
+    cor          VARCHAR(60)            DEFAULT 'indigo',
+    criado_em    TIMESTAMP              DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_caixinha_usuario
+        FOREIGN KEY (id_usuario)
+        REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_caixinha_usuario_nome
+        UNIQUE (id_usuario, nome)
+);
+
+CREATE INDEX IF NOT EXISTS idx_caixinha_usuario ON caixinha_pessoal(id_usuario);
+
+
+-- ============================================
 -- TABELAS DE NOTIFICAÇÕES
 -- Sprint 10: central de notificações e preferências.
 -- ============================================
@@ -302,58 +330,3 @@ CREATE TABLE IF NOT EXISTS notificacao (
 CREATE INDEX IF NOT EXISTS idx_notificacao_usuario    ON notificacao(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_notificacao_prioridade ON notificacao(prioridade);
 CREATE INDEX IF NOT EXISTS idx_notificacao_lida       ON notificacao(id_usuario, lida);
-
-
--- ============================================
--- DADOS DE SEED — USUÁRIO ADMIN
---
--- ATENÇÃO: A senha abaixo está em texto puro e deve ser
--- substituída por um hash bcrypt antes de usar em produção.
--- O backend faz upgrade automático de senhas legadas para bcrypt
--- no primeiro login (ver Usuario.validarSenha).
--- ============================================
-INSERT INTO usuario (nome, email, senha, role)
-VALUES ('Administrador', 'admin@sistema.com', 'admin123', 'admin')
-ON CONFLICT (email) DO NOTHING;
-
-
--- ============================================
--- DADOS DE SEED — CLIENTES DE TESTE
--- Vinculados ao usuário admin (id_usuario = 1).
--- ============================================
-INSERT INTO cliente (id_usuario, nome, sobrenome, telefone, cidade, estado, status_cliente) VALUES
-(1, 'Carlos',   'Eduardo Silva',     '(11) 98765-4321', 'São Paulo',       'SP', TRUE),
-(1, 'Ana',      'Beatriz Rodrigues', '(21) 99888-7766', 'Rio de Janeiro',  'RJ', TRUE),
-(1, 'Mariana',  'Souza Costa',       '(31) 98877-2233', 'Belo Horizonte',  'MG', TRUE),
-(1, 'Ricardo',  'Almeida Santos',    '(41) 97766-5544', 'Curitiba',        'PR', FALSE),
-(1, 'Juliana',  'Fernandes Lima',    '(81) 99111-2233', 'Recife',          'PE', TRUE);
-
-
--- ============================================
--- DADOS DE SEED — EMPRÉSTIMOS DE TESTE
--- Vinculados ao usuário admin (id_usuario = 1).
--- ============================================
-INSERT INTO emprestimo (id_usuario, id_cliente, valor_emprestimo, num_parcelas, valor_parcela, juros, tipo_juros, data_emprestimo, data_devolucao, status_emprestimo) VALUES
-(1, 1, 5000.00,  12, 458.33, 1.50, 'simples',   '2026-01-15', NULL,         TRUE),
-(1, 2, 10000.00, 24, 520.83, 2.00, 'compostos', '2026-03-10', NULL,         TRUE),
-(1, 3, 2000.00,   6, 350.00, 1.80, 'simples',   '2025-06-01', '2025-12-01', FALSE);
-
-
--- ============================================
--- DADOS DE SEED — PARCELAS DE TESTE
--- ============================================
-INSERT INTO parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, data_vencimento, data_pagamento, status_parcela) VALUES
-(1, 1, 458.33, 458.33, '2026-02-15', '2026-02-14', 'pago'),
-(1, 2, 458.33, 458.33, '2026-03-15', '2026-03-15', 'pago'),
-(1, 3, 458.33,   0.00, '2026-04-15', NULL,          'pendente'),
-(1, 4, 458.33,   0.00, '2026-05-15', NULL,          'pendente');
-
-INSERT INTO parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, data_vencimento, data_pagamento, status_parcela) VALUES
-(2, 1, 520.83, 520.83, '2026-04-10', '2026-04-10', 'pago'),
-(2, 2, 520.83,   0.00, '2026-05-10', NULL,          'pendente'),
-(2, 3, 520.83,   0.00, '2026-06-10', NULL,          'pendente');
-
-INSERT INTO parcela (id_emprestimo, numero_parcela, valor_esperado, valor_pago, data_vencimento, data_pagamento, status_parcela) VALUES
-(3, 1, 350.00, 350.00, '2025-07-01', '2025-07-01', 'pago'),
-(3, 2, 350.00, 350.00, '2025-08-01', '2025-08-02', 'pago'),
-(3, 3, 350.00, 350.00, '2025-09-01', '2025-09-01', 'pago');

@@ -1,6 +1,6 @@
 # LoanSystem — AI Context
 
-> Última atualização: Sprint 10 concluída.
+> Última atualização: Sprint 13 (Parte 1 concluída).
 
 ---
 
@@ -481,32 +481,24 @@ Nenhuma funcionalidade nova será criada nesta Sprint; o foco é refatorar e ape
 
 ---
 
-## Sprint 13 — Polimento Final
+## Sprint 13 — Polimento Final & Resiliência
 
-**Status:** ⏳ Planejada
+**Status:** 🔄 Em Andamento (Parte 1 Concluída)
 
-Objetivo:
+### Parte 1 — DDL Limpo + Resiliência de API Offline & Rota 404 (✅ Concluída)
 
-Transformar o sistema em um aplicativo profissional.
+Implementado:
 
-Adicionar:
+- **Limpeza e Ajustes do DDL (`init.sql`)**: remoção de dados de seed mock, atualização do `role` padrão para `'credor'`, inclusão da coluna `ativo` na tabela `usuario` e criação da DDL para `caixinha_pessoal`.
+- **Página de Erro 404 (`Erro404.tsx`)**: rota catch-all com gradiente e visual mobile-first para URLs inexistentes.
+- **Central de Conectividade da API (`ApiStatusContext.tsx` / `BaseRequests.ts`)**: monitoramento global com disparos automáticos de eventos `api:offline` e `api:online` em falhas de rede / status 503/504.
+- **Banner de Alerta de Servidor Offline (`Layout.tsx`)**: aviso fixo no topo da aplicação com botão de tentativa de reconexão.
+- **Componente de Erro de Conexão (`ErroAPI.tsx`)**: ícone animado, mensagens amigáveis e temporizador regressivo de auto-retry (30s).
 
-- Skeleton Loading
-- Empty States ilustrados
-- Micro animações
-- Transições suaves
-- Melhorias no Dark Mode
-- Feedback visual
-- Confirmações elegantes
-- Melhorias de UX
-- Melhorias de acessibilidade
-- Revisão completa do fluxo Mobile
+### Próximas Partes da Sprint 13
 
-Pergunta principal:
-
-> Uma pessoa que nunca utilizou o LoanSystem consegue aprender a usar o aplicativo em menos de cinco minutos?
-
-Se a resposta for não, o fluxo deverá ser redesenhado.
+- **Parte 2 — Caixinhas (Estilo Nubank)**: persistência PostgreSQL, endpoints da API, hook `useCaixinhas` com otimismo e UI carrossel.
+- **Parte 3 — Dashboard Admin (Gestão de Credores SaaS)**: controle de credores, métricas globais e rotas protegidas `/admin`.
 
 ---
 

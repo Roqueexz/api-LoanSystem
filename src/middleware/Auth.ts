@@ -60,6 +60,14 @@ export class Auth {
                 });
             }
 
+            if (usuario.ativo === false) {
+                logger.warn({ email }, 'Tentativa de login de usuario suspenso');
+                return res.status(403).json({
+                    auth: false,
+                    message: "Conta suspensa. Entre em contato com o administrador."
+                });
+            }
+
             const usuarioResponse = {
                 id_usuario: usuario.id_usuario,
                 nome: usuario.nome,
@@ -110,7 +118,7 @@ export class Auth {
             });
         }
 
-        jwt.verify(token, SECRET, (err, decoded) => {
+        jwt.verify(token, SECRET, async (err, decoded) => {
             if (err) {
                 if (err.name === 'TokenExpiredError') {
                     logger.warn({ token }, 'Token expirado');
@@ -154,8 +162,24 @@ export class Auth {
                 });
             }
 
-            (req as any).usuario = decoded;
-            next();
+            // Checagem de segurança em tempo real no DB se a conta do usuário está ativa
+            try {
+                const usuario = await Usuario.buscarPorId(id);
+                if (!usuario || usuario.ativo === false) {
+                    logger.warn({ id }, 'Acesso negado: conta suspensa ou inexistente');
+                    return res.status(403).json({
+                        message: "Conta suspensa. Entre em contato com o administrador.",
+                        auth: false
+                    });
+                }
+                // Garante role atualizado a partir do DB
+                (req as any).usuario = { ...(decoded as JwtPayload), role: usuario.role };
+                next();
+            } catch (dbErr) {
+                logger.error({ dbErr, id }, 'Erro ao verificar status do usuario no middleware Auth');
+                (req as any).usuario = decoded;
+                next();
+            }
         });
     }
 }

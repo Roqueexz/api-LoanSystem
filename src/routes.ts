@@ -15,6 +15,7 @@ import CalendarioController from "./controller/CalendarioController.js";
 import NotificacaoController from "./controller/NotificacaoController.js";
 import { AuthController } from "./controller/AuthController.js";
 import UsuarioController from "./controller/UsuarioController.js";
+import CaixinhaController from "./controller/CaixinhaController.js";
 
 import { validate } from "./middleware/Validation.js";
 import { ClienteSchema } from "./schemas/ClienteSchema.js";
@@ -23,6 +24,7 @@ import { LoginSchema } from "./schemas/AuthSchema.js";
 import { ContaSchema } from "./schemas/ContaSchema.js";
 import { MetaSchema, MetaUpdateSchema } from "./schemas/MetaSchema.js";
 import { AtualizarPerfilSchema, AlterarSenhaSchema } from "./schemas/UsuarioSchema.js";
+import { CaixinhaSchema, ValorCaixinhaSchema } from "./schemas/CaixinhaSchema.js";
 
 const router = Router();
 const authController = new AuthController();
@@ -290,6 +292,36 @@ router.delete(
   "/api/caixa-pessoal/metas/:id",
   Auth.verifyToken,
   CaixaPessoalController.removerMeta,
+);
+
+// Sprint 13: Caixinhas de Reserva
+router.get(
+  "/api/caixinhas",
+  Auth.verifyToken,
+  CaixinhaController.listar,
+);
+router.post(
+  "/api/caixinhas",
+  Auth.verifyToken,
+  validate(CaixinhaSchema),
+  CaixinhaController.criar,
+);
+router.patch(
+  "/api/caixinhas/:id/depositar",
+  Auth.verifyToken,
+  validate(ValorCaixinhaSchema),
+  CaixinhaController.depositar,
+);
+router.patch(
+  "/api/caixinhas/:id/resgatar",
+  Auth.verifyToken,
+  validate(ValorCaixinhaSchema),
+  CaixinhaController.resgatar,
+);
+router.delete(
+  "/api/caixinhas/:id",
+  Auth.verifyToken,
+  CaixinhaController.remover,
 );
 
 export { router };

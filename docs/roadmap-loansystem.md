@@ -1,6 +1,6 @@
 # LoanSystem — AI Context
 
-> Última atualização: Sprint 13 (Parte 1 concluída).
+> Última atualização: Sprint 13 (Partes 1 e 2 concluídas).
 
 ---
 
@@ -483,7 +483,7 @@ Nenhuma funcionalidade nova será criada nesta Sprint; o foco é refatorar e ape
 
 ## Sprint 13 — Polimento Final & Resiliência
 
-**Status:** 🔄 Em Andamento (Parte 1 Concluída)
+**Status:** 🔄 Em Andamento (Partes 1 e 2 Concluídas)
 
 ### Parte 1 — DDL Limpo + Resiliência de API Offline & Rota 404 (✅ Concluída)
 
@@ -495,9 +495,18 @@ Implementado:
 - **Banner de Alerta de Servidor Offline (`Layout.tsx`)**: aviso fixo no topo da aplicação com botão de tentativa de reconexão.
 - **Componente de Erro de Conexão (`ErroAPI.tsx`)**: ícone animado, mensagens amigáveis e temporizador regressivo de auto-retry (30s).
 
-### Próximas Partes da Sprint 13
+### Parte 2 — Redesign Caixinhas Estilo Nubank (✅ Concluída)
 
-- **Parte 2 — Caixinhas (Estilo Nubank)**: persistência PostgreSQL, endpoints da API, hook `useCaixinhas` com otimismo e UI carrossel.
+Implementado:
+
+- **Schema e Validação Zod (`CaixinhaSchema.ts`)**: schemas `CaixinhaSchema` e `ValorCaixinhaSchema`.
+- **Modelo Backend (`Caixinha.ts`)**: operações SQL no PostgreSQL (`listar`, `criar`, `depositar`, `resgatar`, `remover`) com isolamento por usuário (`id_usuario`).
+- **Controller & Rotas (`CaixinhaController.ts` / `routes.ts`)**: endpoints `/api/caixinhas` autenticados com JWT.
+- **Client & Hook Reativo (`CaixinhaRequests.ts` / `useCaixinhas.ts`)**: gerenciamento de estado cliente com suporte a atualização otimista.
+- **Redesign Visual (`CaixinhasCard.tsx`)**: carrossel com rolagem horizontal (Snap Scroll), empty state ilustrado com porquinho animado 🐷, seletor de emojis (20 opções), paleta de cores (6 temas de gradiente), chips de sugestão rápida e modais interativos para depósito/resgate e exclusão.
+
+### Próxima Parte
+
 - **Parte 3 — Dashboard Admin (Gestão de Credores SaaS)**: controle de credores, métricas globais e rotas protegidas `/admin`.
 
 ---

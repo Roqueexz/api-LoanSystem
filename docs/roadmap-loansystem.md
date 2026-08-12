@@ -455,7 +455,8 @@ Nenhuma funcionalidade nova será criada nesta Sprint; o foco é refatorar e ape
    - Organização visual por abas acessíveis (Extrato, Contas a Pagar/Receber, Cofre Digital, Metas).
 
 4. **Fila 4 — Demais Funcionalidades (Dashboard, Calendário, Notificações, Perfil)**:
-   - Ajustes de layout, responsividade e componentes reutilizáveis.
+   - **Central de Notificações (`/notificacoes`)**: ✅ Concluída — Redesign Mobile-First inspirado em apps bancários (Itaú/Nubank), busca em tempo real (`termoBusca`), cards de recursos rápidos (iToken, Caixa, Régua de Cobrança WhatsApp) e canais de atendimento ("Precisa de ajuda?" - Chat assistente virtual, WhatsApp direto e Telefones/SAC).
+   - Ajustes de layout, responsividade e componentes reutilizáveis no Dashboard, Calendário e Perfil.
    - Padronização de hooks e eliminação de código legado/duplicado.
 
 ---

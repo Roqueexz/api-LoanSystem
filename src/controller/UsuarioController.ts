@@ -122,13 +122,14 @@ export class UsuarioController {
   async uploadAvatar(req: Request, res: Response): Promise<void> {
     try {
       const payload = (req as any).usuario as JwtPayload;
+      const file = (req as any).file;
       // multer middleware should have parsed the file
-      if (!req.file) {
+      if (!file) {
         res.status(400).json({ mensagem: 'Arquivo de avatar não fornecido.' });
         return;
       }
       // Process image (resize, convert to WebP)
-      const processedPath = await processImage(req.file.path);
+      const processedPath = await processImage(file.path);
       // Build URL relative to public folder
       const filename = path.basename(processedPath);
       const avatarUrl = `/uploads/${filename}`;

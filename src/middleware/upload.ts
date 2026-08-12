@@ -2,6 +2,10 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Destination directory – relative to the backend project root
 const uploadDir = path.resolve(__dirname, '../../interface-LoanSystem/public/uploads');
@@ -14,7 +18,7 @@ if (!fs.existsSync(uploadDir)) {
 export const upload = multer({
   dest: uploadDir,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
-  fileFilter: (req, file, cb) => {
+  fileFilter: (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     const allowed = /\.(png|jpe?g|webp)$/i;
     if (!allowed.test(file.originalname)) {
       return cb(new Error('Apenas imagens PNG, JPG ou WebP são permitidas.'));

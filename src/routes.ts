@@ -16,6 +16,8 @@ import NotificacaoController from "./controller/NotificacaoController.js";
 import { AuthController } from "./controller/AuthController.js";
 import UsuarioController from "./controller/UsuarioController.js";
 import CaixinhaController from "./controller/CaixinhaController.js";
+import AdminController from "./controller/AdminController.js";
+import { verifyAdmin } from "./middleware/AdminAuth.js";
 
 import { validate } from "./middleware/Validation.js";
 import { ClienteSchema } from "./schemas/ClienteSchema.js";
@@ -322,6 +324,44 @@ router.delete(
   "/api/caixinhas/:id",
   Auth.verifyToken,
   CaixinhaController.remover,
+);
+
+// Sprint 13: Painel Admin SaaS (Gestão de Credores)
+router.get(
+  "/api/admin/resumo",
+  Auth.verifyToken,
+  verifyAdmin,
+  AdminController.resumo,
+);
+router.get(
+  "/api/admin/credores",
+  Auth.verifyToken,
+  verifyAdmin,
+  AdminController.listarCredores,
+);
+router.post(
+  "/api/admin/credores",
+  Auth.verifyToken,
+  verifyAdmin,
+  AdminController.criarCredor,
+);
+router.patch(
+  "/api/admin/credores/:id/suspender",
+  Auth.verifyToken,
+  verifyAdmin,
+  AdminController.suspenderCredor,
+);
+router.patch(
+  "/api/admin/credores/:id/reativar",
+  Auth.verifyToken,
+  verifyAdmin,
+  AdminController.reativarCredor,
+);
+router.delete(
+  "/api/admin/credores/:id",
+  Auth.verifyToken,
+  verifyAdmin,
+  AdminController.removerCredor,
 );
 
 export { router };

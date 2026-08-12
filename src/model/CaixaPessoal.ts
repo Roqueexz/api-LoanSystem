@@ -407,25 +407,54 @@ export default class CaixaPessoal {
         id_usuario: number,
         id_conta: number
     ): Promise<boolean> {
+        const client = await database.connect();
         try {
+            await client.query('BEGIN');
+
+            const contaRes = await client.query(
+                `SELECT tipo, descricao, valor, categoria FROM caixa_pessoal_conta WHERE id_conta = $1 AND id_usuario = $2`,
+                [id_conta, id_usuario]
+            );
+
+            if (contaRes.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return false;
+            }
+
+            const conta = contaRes.rows[0];
+
             const query = `
                 UPDATE caixa_pessoal_conta
                 SET pago = TRUE, status = 'paga'
                 WHERE id_conta = $1 AND id_usuario = $2
                 RETURNING id_conta
             `;
-            const resultado = await database.query(query, [id_conta, id_usuario]);
+            const resultado = await client.query(query, [id_conta, id_usuario]);
 
             const atualizado = (resultado.rowCount ?? 0) > 0;
 
             if (atualizado) {
-                logger.info({ id_usuario, id_conta }, '[CaixaPessoal] Conta marcada como paga');
+                const tipoMov = conta.tipo === 'receber' ? 'entrada' : 'saida';
+                const catMov = conta.categoria || (conta.tipo === 'receber' ? 'Recebimento de Conta' : 'Pagamento de Conta');
+                const descMov = `Pagamento: ${conta.descricao}`;
+
+                await client.query(
+                    `INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)
+                     VALUES ($1, $2, $3, $4, $5, CURRENT_DATE)`,
+                    [id_usuario, tipoMov, Number(conta.valor), catMov, descMov]
+                );
+
+                logger.info({ id_usuario, id_conta }, '[CaixaPessoal] Conta marcada como paga e movimentação gerada');
             }
 
+            await client.query('COMMIT');
             return atualizado;
         } catch (error) {
+            await client.query('ROLLBACK');
             logger.error({ error, id_usuario, id_conta }, '[CaixaPessoal] Erro ao pagar conta');
             throw error;
+        } finally {
+            client.release();
         }
     }
 

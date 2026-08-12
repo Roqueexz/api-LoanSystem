@@ -1,6 +1,6 @@
 # LoanSystem — AI Context
 
-> Última atualização: Sprint 13 (Partes 1 e 2 concluídas).
+> Última atualização: Sprint 13 concluída com sucesso.
 
 ---
 
@@ -481,9 +481,9 @@ Nenhuma funcionalidade nova será criada nesta Sprint; o foco é refatorar e ape
 
 ---
 
-## Sprint 13 — Polimento Final & Resiliência
+## Sprint 13 — Polimento Final, Resiliência & Dashboard Admin SaaS
 
-**Status:** 🔄 Em Andamento (Partes 1 e 2 Concluídas)
+**Status:** ✅ Concluída
 
 ### Parte 1 — DDL Limpo + Resiliência de API Offline & Rota 404 (✅ Concluída)
 
@@ -505,9 +505,16 @@ Implementado:
 - **Client & Hook Reativo (`CaixinhaRequests.ts` / `useCaixinhas.ts`)**: gerenciamento de estado cliente com suporte a atualização otimista.
 - **Redesign Visual (`CaixinhasCard.tsx`)**: carrossel com rolagem horizontal (Snap Scroll), empty state ilustrado com porquinho animado 🐷, seletor de emojis (20 opções), paleta de cores (6 temas de gradiente), chips de sugestão rápida e modais interativos para depósito/resgate e exclusão.
 
-### Próxima Parte
+### Parte 3 — Dashboard Admin & Gestão de Credores SaaS (✅ Concluída)
 
-- **Parte 3 — Dashboard Admin (Gestão de Credores SaaS)**: controle de credores, métricas globais e rotas protegidas `/admin`.
+Implementado:
+
+- **Middleware de Proteção por Role (`AdminAuth.ts`)**: bloqueio de acesso a `/api/admin/*` para usuários sem privilégios de `role === 'admin'`.
+- **Checagem de Segurança em Tempo Real (`Auth.ts`)**: verificação do status `ativo` do credor no banco a cada requisição, retornando erro 403 ("Conta suspensa") caso o credor esteja bloqueado.
+- **Modelo Backend & Controller (`Admin.ts` / `AdminController.ts` / `routes.ts`)**: estatísticas globais (`resumoGlobal`), listagem (`listarCredores`), cadastro (`criarCredor`), suspensão (`suspenderCredor`), reativação (`reativarCredor`) e exclusão (`removerCredor`).
+- **Guarda de Rota Frontend (`AdminRoute.tsx`)**: proteção da rota `/admin` no React Router DOM apenas para administradores.
+- **Dashboard SaaS Admin (`DashboardAdmin.tsx` & `PAdmin.tsx`)**: 4 cards de métricas globais (Credores, Ativos, Clientes, Volume Total R$), busca em tempo real, badges de status (`Ativo` / `Suspenso`), botões de ação e modal de cadastro de credor (`ModalCriarCredor.tsx`).
+- **Navegacao & MenuDrawer (`Navegacao.tsx` / `MenuDrawer.tsx`)**: exibição dinâmica do link `⚡ Admin` apenas para perfil administrador.
 
 ---
 

@@ -10,6 +10,7 @@ export interface UsuarioDTO {
   email: string;
   senha: string;
   role: string;
+  ativo?: boolean;
   criado_em: Date;
   avatar_url?: string | null;
 }
@@ -20,6 +21,7 @@ export default class Usuario {
   private email: string;
   private senha: string;
   private role: string;
+  private ativo: boolean = true;
   private criado_em: Date;
   private avatar_url?: string | null;
 
@@ -27,13 +29,14 @@ export default class Usuario {
     _nome: string,
     _email: string,
     _senha: string,
-    _role: string = "admin",
+    _role: string = "credor",
     _criado_em?: Date
   ) {
     this.nome = capitalizar(_nome);
     this.email = _email.toLowerCase().trim();
     this.senha = _senha;
     this.role = _role;
+    this.ativo = true;
     this.criado_em = _criado_em || new Date();
   }
 
@@ -49,6 +52,8 @@ export default class Usuario {
   public setSenha(senha: string): void { this.senha = senha; }
   public getRole(): string { return this.role; }
   public setRole(role: string): void { this.role = role; }
+  public isAtivo(): boolean { return this.ativo; }
+  public setAtivo(ativo: boolean): void { this.ativo = ativo; }
   public getCriadoEm(): Date { return this.criado_em; }
   public setCriadoEm(d: Date): void { this.criado_em = d; }
 
@@ -59,6 +64,7 @@ export default class Usuario {
       email: row.email,
       senha: row.senha,
       role: row.role,
+      ativo: row.ativo ?? true,
       criado_em: row.created_em ?? row.criado_em,
       avatar_url: row.avatar_url ?? null,
     };

@@ -71,19 +71,21 @@ export default class Cliente {
   ): Promise<ClienteDTO | ClienteDTO[]> {
     try {
       if (typeof id_cliente === "number") {
+        // 🔥 FILTRA POR id_usuario
         const querySelectCliente = `
           SELECT * FROM Cliente
-          WHERE id_cliente = $1 AND id_usuario = $2
+          WHERE id_cliente = $1 AND id_usuario = $2 AND status_cliente = TRUE
         `;
         const respostaBD = await database.query(querySelectCliente, [id_cliente, id_usuario]);
-
+  
         if (respostaBD.rows.length === 0) {
           throw new Error(`Cliente com ID ${id_cliente} não encontrado.`);
         }
-
+  
         return Cliente.toDTO(respostaBD.rows[0]);
       }
-
+  
+      // 🔥 FILTRA POR id_usuario
       const queryAll = `
         SELECT * FROM Cliente
         WHERE id_usuario = $1 AND status_cliente = TRUE
@@ -96,36 +98,40 @@ export default class Cliente {
       throw error;
     }
   }
+  
 
   static async obterResumo(id_cliente: number, id_usuario: number): Promise<ResumoClienteDTO> {
+    // 🔥 VERIFICA OWNERSHIP
     const cliente = (await Cliente.listarClientes(id_usuario, id_cliente)) as ClienteDTO;
-    const emprestimos = await Emprestimo.listarEmprestimos('todos', id_cliente);
-
+    
+    // 🔥 PASSA id_usuario PARA O EMPRÉSTIMO (3 argumentos)
+    const emprestimos = await Emprestimo.listarEmprestimos('todos', id_cliente, id_usuario);
+  
     const emprestimosComParcelas = await Promise.all(
       emprestimos.map(async (emp) => ({
         ...emp,
         parcelas: await Parcela.listarPorEmprestimo(emp.id_emprestimo!),
       })),
     );
-
+  
     const todasParcelas = emprestimosComParcelas.flatMap((emp) => emp.parcelas);
-
+  
     const total_emprestado = emprestimos
       .filter((emp) => emp.status_emprestimo)
       .reduce((acc, emp) => acc + Number(emp.valor_emprestimo), 0);
-
+  
     const total_recebido = todasParcelas
       .filter((p) => p.status_parcela === 'PAGA')
       .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
-
+  
     const total_em_aberto = todasParcelas
       .filter((p) => p.status_parcela !== 'PAGA')
       .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
-
+  
     const total_atrasado = todasParcelas
       .filter((p) => p.status_parcela === 'ATRASADA')
       .reduce((acc, p) => acc + Number(p.valor_parcela), 0);
-
+  
     return {
       cliente,
       emprestimos: emprestimosComParcelas,
@@ -140,12 +146,10 @@ export default class Cliente {
 
   static async cadastrarCliente(cliente: Cliente, id_usuario: number): Promise<number> {
     try {
-      const queryInsertCliente = `
-        INSERT INTO Cliente (id_usuario, nome, sobrenome, telefone, cidade, estado, criado_em)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id_cliente;
-      `;
-
+      console.log('[DEBUG] ===== INICIO CADASTRO CLIENTE MODEL =====');
+      console.log('[DEBUG] id_usuario recebido:', id_usuario);
+      console.log('[DEBUG] Tipo de id_usuario:', typeof id_usuario);
+      
       const valores = [
         id_usuario,
         cliente.getNome(),
@@ -155,61 +159,82 @@ export default class Cliente {
         cliente.getEstado(),
         cliente.getCriadoEm(),
       ];
-
+  
+      console.log('[DEBUG] Valores para INSERT:', valores.map((v, i) => `$${i+1}: ${v}`).join(', '));
+  
+      const queryInsertCliente = `
+        INSERT INTO Cliente (id_usuario, nome, sobrenome, telefone, cidade, estado, criado_em)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id_cliente;
+      `;
+  
+      console.log('[DEBUG] Query SQL:', queryInsertCliente);
+      console.log('[DEBUG] Executando query...');
+  
       const result = await database.query(queryInsertCliente, valores);
+      console.log('[DEBUG] Resultado da query:', result);
+      console.log('[DEBUG] rows:', result.rows);
+      console.log('[DEBUG] rowCount:', result.rowCount);
+  
       if (result.rows.length === 0) {
+        console.error('[DEBUG] INSERT nao retornou ID');
         throw new Error("INSERT não retornou ID — cadastro pode ter falhado silenciosamente.");
       }
-
+  
       const id_cliente = result.rows[0].id_cliente as number;
-      console.info(`[ClienteModel] Cliente cadastrado com sucesso. ID: ${id_cliente}, usuario: ${id_usuario}`);
+      console.log(`[ClienteModel] Cliente cadastrado com sucesso. ID: ${id_cliente}, usuario: ${id_usuario}`);
       return id_cliente;
     } catch (error) {
-      console.error(`[ClienteModel] Erro ao cadastrar cliente:`, error);
+      console.error('[DEBUG] ===== ERRO NO MODEL =====');
+      console.error('[DEBUG] Erro detalhado:', error);
+      if (error instanceof Error) {
+        console.error('[DEBUG] Mensagem:', error.message);
+        console.error('[DEBUG] Stack:', error.stack);
+      }
       throw error;
     }
   }
-
   static async removerCliente(id_cliente: number, id_usuario: number): Promise<boolean> {
     const client = await database.connect();
-
+  
     try {
+      // 🔥 VERIFICA OWNERSHIP
       const cliente: ClienteDTO = (await Cliente.listarClientes(id_usuario, id_cliente)) as ClienteDTO;
-
+  
       if (!cliente.status_cliente) {
         return false;
       }
-
+  
       const queryPagas = `
         SELECT COUNT(*)::int AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE e.id_cliente = $1 AND e.id_usuario = $2 AND p.status_parcela = 'pago'
+        WHERE e.id_cliente = $1 AND e.id_usuario = $2 AND p.status_parcela = 'PAGA'
       `;
       const resultPagas = await client.query(queryPagas, [id_cliente, id_usuario]);
       const pagas = resultPagas.rows[0]?.total ?? 0;
-
+  
       if (pagas > 0) {
         throw new Error(
           `Não é possível inativar cliente com ${pagas} parcela(s) paga(s). ` +
           `Para remover, primeiro desfaça os pagamentos.`
         );
       }
-
+  
       await client.query("BEGIN");
-
+  
       await Parcela.excluirPendentesPorCliente(id_cliente, client);
-
+  
       await client.query(
         `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_cliente = $1 AND id_usuario = $2`,
         [id_cliente, id_usuario]
       );
-
+  
       const result = await client.query(
         `UPDATE Cliente SET status_cliente = FALSE WHERE id_cliente = $1 AND id_usuario = $2`,
         [id_cliente, id_usuario]
       );
-
+  
       await client.query("COMMIT");
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
@@ -220,18 +245,20 @@ export default class Cliente {
       client.release();
     }
   }
+  
 
   static async atualizarCliente(cliente: Cliente, id_usuario: number): Promise<boolean> {
     try {
+      // 🔥 VERIFICA OWNERSHIP
       const clienteConsulta: ClienteDTO = (await Cliente.listarClientes(
         id_usuario,
         cliente.getIdCliente(),
       )) as ClienteDTO;
-
+  
       if (!clienteConsulta.status_cliente) {
         return false;
       }
-
+  
       const queryAtualizarCliente = `
         UPDATE Cliente SET
             nome = $1,
@@ -241,7 +268,7 @@ export default class Cliente {
             estado = $5
         WHERE id_cliente = $6 AND id_usuario = $7
       `;
-
+  
       const valores = [
         cliente.getNome(),
         cliente.getSobrenome(),
@@ -249,9 +276,9 @@ export default class Cliente {
         cliente.getCidade(),
         cliente.getEstado(),
         cliente.getIdCliente(),
-        id_usuario,
+        id_usuario,  // 🔥 VERIFICA OWNERSHIP
       ];
-
+  
       const respostaBD = await database.query(queryAtualizarCliente, valores);
       return (respostaBD.rowCount ?? 0) > 0;
     } catch (error) {

@@ -302,34 +302,34 @@ export default class Usuario {
             criado_em
           FROM cliente
           WHERE id_usuario = $1
-
+  
           UNION ALL
-
+  
           -- Empréstimos registrados
           SELECT
             'emprestimo' AS tipo,
             'Empréstimo registrado' AS descricao,
-            CONCAT(c.nome, ' — R$ ', TO_CHAR(e.valor, 'FM999G999G990D00')) AS detalhe,
+            CONCAT(c.nome, ' — R$ ', TO_CHAR(e.valor_emprestimo, 'FM999G999G990D00')) AS detalhe,
             e.criado_em
           FROM emprestimo e
           JOIN cliente c ON c.id_cliente = e.id_cliente
           WHERE e.id_usuario = $1
-
+  
           UNION ALL
-
+  
           -- Movimentações do caixa pessoal
           SELECT
             CASE WHEN tipo = 'entrada' THEN 'recebimento' ELSE 'saida' END AS tipo,
             CASE WHEN tipo = 'entrada' THEN 'Recebimento registrado' ELSE 'Saída registrada' END AS descricao,
             CONCAT(descricao, ' — R$ ', TO_CHAR(valor, 'FM999G999G990D00')) AS detalhe,
             criado_em
-          FROM movimentacao_caixa_pessoal
+          FROM caixa_pessoal_movimentacao
           WHERE id_usuario = $1
         ) atividades
         ORDER BY criado_em DESC
         LIMIT $2
       `;
-
+  
       const res = await database.query(query, [id_usuario, limite]);
       return res.rows;
     } catch (error) {

@@ -4,8 +4,23 @@ import logger from "../services/Logger.js";
 import { isNumeroValido } from "../services/Utilitario.js";
 
 export default class EmprestimoController {
+  
+  private static obterIdUsuario(req: Request): number | null {
+    const id = (req as any).usuario?.id;
+    if (id === undefined || id === null || !isNumeroValido(Number(id))) {
+      return null;
+    }
+    return Number(id);
+  }
+
   static async todos(req: Request, res: Response) {
     try {
+      const idUsuario = EmprestimoController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
+      }
+
       const statusParam = req.query.status as string;
       
       let status: 'ativo' | 'quitado' | 'todos' = 'ativo';
@@ -15,7 +30,7 @@ export default class EmprestimoController {
         status = 'todos';
       }
 
-      const lista = await Emprestimo.listarEmprestimos(status);
+      const lista = await Emprestimo.listarEmprestimos(status, undefined, idUsuario);
       
       if (!lista || lista.length === 0) {
         res.status(204).send();
@@ -30,6 +45,12 @@ export default class EmprestimoController {
 
   static async emprestimo(req: Request, res: Response) {
     try {
+      const idUsuario = EmprestimoController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
+      }
+
       const id = parseInt(req.params.id as string);
 
       if (!isNumeroValido(id)) {
@@ -37,12 +58,12 @@ export default class EmprestimoController {
         return;
       }
 
-      const emp = await Emprestimo.listarEmprestimo(id);
+      const emp = await Emprestimo.listarEmprestimo(id, idUsuario);
       res.status(200).json(emp);
     } catch (error: any) {
       logger.error({ error, id: req.params.id }, "[EmprestimoController] Erro ao buscar emprestimo");
       
-      if (error.message?.includes("nao encontrado")) {
+      if (error.message?.includes("nao encontrado") || error.message?.includes("não encontrado")) {
         res.status(404).json({ mensagem: error.message });
         return;
       }
@@ -52,7 +73,20 @@ export default class EmprestimoController {
 
   static async cadastrar(req: Request, res: Response) {
     try {
+      const idUsuario = EmprestimoController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
+      }
+
       const dados = req.body;
+
+      // Validar se o cliente pertence ao credor
+      const clienteExiste = await Emprestimo.validarClientePertenceAoCredor(dados.id_cliente, idUsuario);
+      if (!clienteExiste) {
+        res.status(400).json({ mensagem: "Cliente nao encontrado ou nao pertence a este credor." });
+        return;
+      }
 
       const valorParcela = dados.valor_parcela ? Number(dados.valor_parcela) : 0;
 
@@ -69,7 +103,6 @@ export default class EmprestimoController {
         dados.forma_pagamento ?? null,
       );
 
-      const idUsuario = (req as any).usuario?.id ? Number((req as any).usuario.id) : 1;
       const result = await Emprestimo.cadastrarEmprestimo(novo, idUsuario);
       if (result) {
         res.status(201).json({ mensagem: "Emprestimo cadastrado com sucesso." });
@@ -90,6 +123,12 @@ export default class EmprestimoController {
 
   static async remover(req: Request, res: Response) {
     try {
+      const idUsuario = EmprestimoController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
+      }
+
       const id = parseInt(req.params.id as string);
 
       if (!isNumeroValido(id)) {
@@ -97,7 +136,7 @@ export default class EmprestimoController {
         return;
       }
 
-      const result = await Emprestimo.removerEmprestimo(id);
+      const result = await Emprestimo.removerEmprestimo(id, idUsuario);
       if (result) {
         res.status(200).json({ mensagem: "Emprestimo removido com sucesso." });
       } else {
@@ -106,7 +145,6 @@ export default class EmprestimoController {
     } catch (error: any) {
       logger.error({ error, id: req.params.id }, "[EmprestimoController] Erro ao remover emprestimo");
       
-      // Erros de regra de negócio (parcelas pagas, etc.) retornam 400
       if (error.message?.includes("parcela")) {
         res.status(400).json({ mensagem: error.message });
         return;
@@ -118,6 +156,12 @@ export default class EmprestimoController {
 
   static async atualizar(req: Request, res: Response) {
     try {
+      const idUsuario = EmprestimoController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
+      }
+
       const id = parseInt(req.params.id as string);
 
       if (!isNumeroValido(id)) {
@@ -126,6 +170,13 @@ export default class EmprestimoController {
       }
 
       const dados = req.body;
+
+      // Validar se o cliente pertence ao credor
+      const clienteExiste = await Emprestimo.validarClientePertenceAoCredor(dados.id_cliente, idUsuario);
+      if (!clienteExiste) {
+        res.status(400).json({ mensagem: "Cliente nao encontrado ou nao pertence a este credor." });
+        return;
+      }
 
       const valorParcela = dados.valor_parcela ? Number(dados.valor_parcela) : 0;
 
@@ -143,7 +194,7 @@ export default class EmprestimoController {
       );
       emp.setIdEmprestimo(id);
 
-      const result = await Emprestimo.atualizarEmprestimo(emp);
+      const result = await Emprestimo.atualizarEmprestimo(emp, idUsuario);
       if (result) {
         res.status(200).json({ mensagem: "Emprestimo atualizado com sucesso." });
       } else {
@@ -157,7 +208,7 @@ export default class EmprestimoController {
         return;
       }
       
-      if (error.message?.includes("nao encontrado")) {
+      if (error.message?.includes("nao encontrado") || error.message?.includes("não encontrado")) {
         res.status(404).json({ mensagem: error.message });
         return;
       }

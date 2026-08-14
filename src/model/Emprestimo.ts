@@ -113,24 +113,34 @@ export default class Emprestimo {
   static async listarEmprestimos(
     status: 'ativo' | 'quitado' | 'todos' = 'ativo',
     id_cliente?: number,
+    id_usuario?: number  
   ): Promise<EmprestimoDTO[]> {
     try {
       const condicoes: string[] = [];
-      const params: number[] = [];
-
+      const params: (number | string)[] = [];
+      let paramIndex = 1;
+  
+      // 🔥 FILTRO POR USUÁRIO (primeiro, pois é obrigatório quando passado)
+      if (id_usuario !== undefined) {
+        condicoes.push(`e.id_usuario = $${paramIndex}`);
+        params.push(id_usuario);
+        paramIndex++;
+      }
+  
       if (status === 'ativo') {
         condicoes.push('e.status_emprestimo = TRUE');
       } else if (status === 'quitado') {
         condicoes.push('e.status_emprestimo = FALSE');
       }
-
-      if (typeof id_cliente === 'number') {
+  
+      if (id_cliente !== undefined) {
+        condicoes.push(`e.id_cliente = $${paramIndex}`);
         params.push(id_cliente);
-        condicoes.push(`e.id_cliente = $${params.length}`);
+        paramIndex++;
       }
-
+  
       const where = condicoes.length > 0 ? `WHERE ${condicoes.join(' AND ')}` : '';
-
+  
       const query = `
         SELECT e.*, c.nome AS nome_cliente, c.sobrenome AS sobrenome_cliente
         FROM Emprestimo e
@@ -138,7 +148,7 @@ export default class Emprestimo {
         ${where}
         ORDER BY e.id_emprestimo DESC
       `;
-
+  
       const res = await database.query(query, params);
       return res.rows.map((r: any) => Emprestimo.toDTO(r));
     } catch (error) {

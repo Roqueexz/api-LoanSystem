@@ -57,12 +57,10 @@ export default class Parcela {
         data_emprestimo
       } = emprestimo;
 
-      // Validar data do emprestimo
       if (!isDataValida(data_emprestimo)) {
         throw new Error('Data do emprestimo invalida.');
       }
 
-      // Calcular montante (valor total com juros)
       let montante = valor_emprestimo;
       if (tipo_juros === 'simples') {
         montante = valor_emprestimo * (1 + (juros / 100) * num_parcelas);
@@ -70,49 +68,43 @@ export default class Parcela {
         montante = valor_emprestimo * Math.pow(1 + juros / 100, num_parcelas);
       }
 
-      // DETERMINAR VALOR DA PARCELA
       let valorParcelaBase: number;
 
       if (valorParcelaInformado && valorParcelaInformado > 0) {
-        // Usuario informou manualmente - validar contra o MONTANTE (com juros)
         const validacao = CalculadoraFinanceira.validarSomaParcelas(
-          montante, // <-- CORRIGIDO: usa montante em vez de valor_emprestimo
+          montante,
           valorParcelaInformado,
           num_parcelas,
-          0.01 // margem de 1 centavo
+          0.01
         );
 
         if (!validacao.valido) {
           throw new Error(
             `Soma das parcelas (${(valorParcelaInformado * num_parcelas).toFixed(2)}) ` +
-            `não confere com o valor total com juros (${montante.toFixed(2)}). ` +
-            `Sugestão: R$ ${validacao.sugestao?.toFixed(2)} por parcela.`
+            `nao confere com o valor total com juros (${montante.toFixed(2)}). ` +
+            `Sugestao: R$ ${validacao.sugestao?.toFixed(2)} por parcela.`
           );
         }
 
         valorParcelaBase = valorParcelaInformado;
       } else {
-        // Calcular automaticamente
         valorParcelaBase = CalculadoraFinanceira.calcularValorParcela(
-          montante, // <-- CORRIGIDO: usa montante em vez de valor_emprestimo
+          montante,
           num_parcelas,
           juros,
           tipo_juros as 'simples' | 'compostos'
         );
-        // Arredondar para 2 casas
         valorParcelaBase = Math.round(valorParcelaBase * 100) / 100;
       }
 
-      // Calcular ajuste da ultima parcela
       const ultimaParcela = CalculadoraFinanceira.ajustarUltimaParcela(
-        montante, // <-- CORRIGIDO: usa montante em vez de valor_emprestimo
+        montante,
         valorParcelaBase,
         num_parcelas,
         juros,
         tipo_juros as 'simples' | 'compostos'
       );
 
-      // GERAR PARCELAS
       const dataBase = new Date(data_emprestimo);
 
       for (let numero = aPartirDe; numero <= num_parcelas; numero++) {
@@ -135,7 +127,7 @@ export default class Parcela {
 
   static async contarPagas(id_emprestimo: number, executor: Executor = database): Promise<number> {
     const res = await executor.query(
-      `SELECT COUNT(*)::int AS total FROM Parcela WHERE id_emprestimo = $1 AND status_parcela = 'pago'`,
+      `SELECT COUNT(*)::int AS total FROM Parcela WHERE id_emprestimo = $1 AND status_parcela = 'PAGA'`,
       [id_emprestimo],
     );
     return res.rows[0]?.total ?? 0;
@@ -176,16 +168,24 @@ export default class Parcela {
     }
   }
 
-  static async listarPorCliente(id_cliente: number): Promise<ParcelaDTO[]> {
+  static async listarPorCliente(id_cliente: number, id_usuario?: number): Promise<ParcelaDTO[]> {
     try {
-      const query = `
+      let query = `
         SELECT p.*
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
         WHERE e.id_cliente = $1
-        ORDER BY e.id_emprestimo, p.numero_parcela ASC
       `;
-      const res = await database.query(query, [id_cliente]);
+      const params: any[] = [id_cliente];
+      
+      if (id_usuario !== undefined) {
+        query += ` AND e.id_usuario = $2`;
+        params.push(id_usuario);
+      }
+      
+      query += ` ORDER BY e.id_emprestimo, p.numero_parcela ASC`;
+      
+      const res = await database.query(query, params);
       return res.rows.map((r: any) => Parcela.toDTO(r));
     } catch (error) {
       console.error(`[ParcelaModel] Erro ao listar parcelas do cliente ${id_cliente}:`, error);
@@ -199,7 +199,7 @@ export default class Parcela {
       const res = await database.query(query, [id_parcela]);
 
       if (res.rows.length === 0) {
-        throw new Error(`Parcela com ID ${id_parcela} não encontrada.`);
+        throw new Error(`Parcela com ID ${id_parcela} nao encontrada.`);
       }
 
       return Parcela.toDTO(res.rows[0]);
@@ -215,7 +215,6 @@ export default class Parcela {
     try {
       await client.query('BEGIN');
 
-      // Busca dados da parcela e cliente para o histórico de movimentações
       const infoRes = await client.query(
         `SELECT p.numero_parcela, p.valor_esperado, e.id_emprestimo, e.num_parcelas, c.nome, c.sobrenome
          FROM Parcela p
@@ -229,7 +228,7 @@ export default class Parcela {
 
       const atualizarParcela = `
         UPDATE Parcela
-        SET status_parcela = 'pago',
+        SET status_parcela = 'PAGA',
             data_pagamento = $2,
             valor_pago = valor_esperado
         WHERE id_parcela = $1
@@ -248,15 +247,14 @@ export default class Parcela {
 
       const id_emprestimo = updateRes.rows[0].id_emprestimo;
 
-      // Inserir registro de ENTRADA no Caixa Pessoal / Central de Movimentações
       if (infoRes.rows.length > 0) {
         const info = infoRes.rows[0];
         const nomeCliente = `${info.nome} ${info.sobrenome}`;
-        const desc = `Recebimento da Parcela ${info.numero_parcela}/${info.num_parcelas} do Empréstimo #${id_emprestimo} - ${nomeCliente}`;
+        const desc = `Recebimento da Parcela ${info.numero_parcela}/${info.num_parcelas} do Emprestimo #${id_emprestimo} - ${nomeCliente}`;
 
         await client.query(
           `INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)
-           VALUES ($1, 'entrada', $2, 'Empréstimo - Recebimento', $3, $4)`,
+           VALUES ($1, 'entrada', $2, 'Emprestimo - Recebimento', $3, $4)`,
           [id_usuario, Number(info.valor_esperado), desc, dtPagto]
         );
       }
@@ -264,7 +262,7 @@ export default class Parcela {
       const parcelasNaoPagas = await client.query(
         `SELECT COUNT(*)::int AS total
          FROM Parcela
-         WHERE id_emprestimo = $1 AND status_parcela != 'pago'`,
+         WHERE id_emprestimo = $1 AND status_parcela != 'PAGA'`,
         [id_emprestimo]
       );
 
@@ -322,11 +320,10 @@ export default class Parcela {
         [id_emprestimo]
       );
 
-      // Inserir registro de SAÍDA (Estorno) no Caixa Pessoal
       if (infoRes.rows.length > 0) {
         const info = infoRes.rows[0];
         const nomeCliente = `${info.nome} ${info.sobrenome}`;
-        const desc = `Estorno da Parcela ${info.numero_parcela} do Empréstimo #${id_emprestimo} - ${nomeCliente}`;
+        const desc = `Estorno da Parcela ${info.numero_parcela} do Emprestimo #${id_emprestimo} - ${nomeCliente}`;
 
         await client.query(
           `INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)

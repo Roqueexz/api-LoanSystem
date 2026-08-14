@@ -4,9 +4,24 @@ import logger from "../services/Logger.js";
 import { isNumeroValido } from "../services/Utilitario.js";
 
 export default class CaixaController {
+  
+  private static obterIdUsuario(req: Request): number | null {
+    const id = (req as any).usuario?.id;
+    if (id === undefined || id === null || !isNumeroValido(Number(id))) {
+      return null;
+    }
+    return Number(id);
+  }
+
   static async resumo(req: Request, res: Response) {
     try {
-      const resumoFinanceiro = await Caixa.obterResumoFinanceiro();
+      const idUsuario = CaixaController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
+      }
+
+      const resumoFinanceiro = await Caixa.obterResumoFinanceiro(idUsuario);
       res.status(200).json(resumoFinanceiro);
     } catch (error) {
       logger.error(
@@ -21,16 +36,22 @@ export default class CaixaController {
 
   static async relatorioDiario(req: Request, res: Response) {
     try {
-      const { data } = req.query;
-
-      // Validar data se fornecida
-      if (data && typeof data !== "string") {
-        return res.status(400).json({
-          mensagem: "Parametro 'data' invalido. Use o formato YYYY-MM-DD.",
-        });
+      const idUsuario = CaixaController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
       }
 
-      const relatorio = await Caixa.obterRelatorioDiario(data as string);
+      const { data } = req.query;
+
+      if (data && typeof data !== "string") {
+        res.status(400).json({
+          mensagem: "Parametro 'data' invalido. Use o formato YYYY-MM-DD.",
+        });
+        return;
+      }
+
+      const relatorio = await Caixa.obterRelatorioDiario(idUsuario, data as string);
       res.status(200).json(relatorio);
     } catch (error) {
       logger.error(
@@ -45,27 +66,33 @@ export default class CaixaController {
 
   static async relatorioMensal(req: Request, res: Response) {
     try {
-      const { ano, mes } = req.query;
-
-      // Validar ano se fornecido
-      if (ano && !isNumeroValido(Number(ano))) {
-        return res.status(400).json({
-          mensagem: "Parametro 'ano' invalido. Informe um numero valido.",
-        });
+      const idUsuario = CaixaController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
       }
 
-      // Validar mes se fornecido
+      const { ano, mes } = req.query;
+
+      if (ano && !isNumeroValido(Number(ano))) {
+        res.status(400).json({
+          mensagem: "Parametro 'ano' invalido. Informe um numero valido.",
+        });
+        return;
+      }
+
       if (mes) {
         const mesNum = Number(mes);
         if (!isNumeroValido(mesNum) || mesNum < 1 || mesNum > 12) {
-          return res.status(400).json({
-            mensagem:
-              "Parametro 'mes' invalido. Informe um valor entre 1 e 12.",
+          res.status(400).json({
+            mensagem: "Parametro 'mes' invalido. Informe um valor entre 1 e 12.",
           });
+          return;
         }
       }
 
       const relatorio = await Caixa.obterRelatorioMensal(
+        idUsuario,
         ano ? Number(ano) : undefined,
         mes ? Number(mes) : undefined,
       );
@@ -83,16 +110,23 @@ export default class CaixaController {
 
   static async relatorioAnual(req: Request, res: Response) {
     try {
+      const idUsuario = CaixaController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
+      }
+
       const { ano } = req.query;
 
-      // Validar ano se fornecido
       if (ano && !isNumeroValido(Number(ano))) {
-        return res.status(400).json({
+        res.status(400).json({
           mensagem: "Parametro 'ano' invalido. Informe um numero valido.",
         });
+        return;
       }
 
       const relatorio = await Caixa.obterRelatorioAnual(
+        idUsuario,
         ano ? Number(ano) : undefined,
       );
       res.status(200).json(relatorio);
@@ -109,7 +143,13 @@ export default class CaixaController {
 
   static async dashboardInteligente(req: Request, res: Response) {
     try {
-      const dashboardData = await Caixa.obterDashboardInteligente();
+      const idUsuario = CaixaController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
+      }
+
+      const dashboardData = await Caixa.obterDashboardInteligente(idUsuario);
       res.status(200).json(dashboardData);
     } catch (error) {
       logger.error(
@@ -124,7 +164,13 @@ export default class CaixaController {
 
   static async indicadoresFinanceiros(req: Request, res: Response) {
     try {
-      const indicadores = await Caixa.obterIndicadoresFinanceiros();
+      const idUsuario = CaixaController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
+      }
+
+      const indicadores = await Caixa.obterIndicadoresFinanceiros(idUsuario);
       res.status(200).json(indicadores);
     } catch (error) {
       logger.error(

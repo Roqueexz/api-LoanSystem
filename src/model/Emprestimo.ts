@@ -120,7 +120,6 @@ export default class Emprestimo {
       const params: (number | string)[] = [];
       let paramIndex = 1;
   
-      // 🔥 FILTRO POR USUÁRIO (primeiro, pois é obrigatório quando passado)
       if (id_usuario !== undefined) {
         condicoes.push(`e.id_usuario = $${paramIndex}`);
         params.push(id_usuario);
@@ -157,15 +156,36 @@ export default class Emprestimo {
     }
   }
 
-  static async listarEmprestimo(id_emprestimo: number): Promise<EmprestimoDTO> {
+  static async validarClientePertenceAoCredor(id_cliente: number, id_usuario: number): Promise<boolean> {
     try {
       const query = `
+        SELECT id_cliente FROM Cliente
+        WHERE id_cliente = $1 AND id_usuario = $2 AND status_cliente = TRUE
+      `;
+      const res = await database.query(query, [id_cliente, id_usuario]);
+      return res.rows.length > 0;
+    } catch (error) {
+      console.error('[EmprestimoModel] Erro ao validar cliente:', error);
+      return false;
+    }
+  }
+
+  static async listarEmprestimo(id_emprestimo: number, id_usuario?: number): Promise<EmprestimoDTO> {
+    try {
+      let query = `
         SELECT e.*, c.nome AS nome_cliente, c.sobrenome AS sobrenome_cliente
         FROM Emprestimo e
         JOIN Cliente c ON e.id_cliente = c.id_cliente
         WHERE e.id_emprestimo = $1
       `;
-      const res = await database.query(query, [id_emprestimo]);
+      const params: any[] = [id_emprestimo];
+      
+      if (id_usuario !== undefined) {
+        query += ` AND e.id_usuario = $2`;
+        params.push(id_usuario);
+      }
+
+      const res = await database.query(query, params);
 
       if (res.rows.length === 0) {
         throw new Error(`Emprestimo com ID ${id_emprestimo} nao encontrado.`);
@@ -182,7 +202,6 @@ export default class Emprestimo {
     const client = await database.connect();
 
     try {
-      // Validar data do emprestimo
       if (!isDataValida(emprestimo.getDataEmprestimo())) {
         throw new Error('Data do emprestimo invalida.');
       }
@@ -191,7 +210,6 @@ export default class Emprestimo {
 
       let valorParcelaCalculado = emprestimo.getValorParcela();
 
-      // Se valor_parcela nao foi informado (0), calcula automaticamente
       if (valorParcelaCalculado === 0) {
         const valorTotal = emprestimo.getValorEmprestimo();
         const numParcelas = emprestimo.getNumParcelas();
@@ -234,7 +252,6 @@ export default class Emprestimo {
       const input = Emprestimo.toParcelaInput(emprestimo, id_emprestimo);
       await Parcela.gerarParcelas(input, client);
 
-      // Registrar movimentação de SAÍDA no Caixa Pessoal
       const cliRes = await client.query(
         `SELECT nome, sobrenome FROM Cliente WHERE id_cliente = $1`,
         [emprestimo.getIdCliente()]
@@ -243,17 +260,17 @@ export default class Emprestimo {
 
       await client.query(
         `INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)
-         VALUES ($1, 'saida', $2, 'Empréstimo Concedido', $3, $4)`,
+         VALUES ($1, 'saida', $2, 'Emprestimo Concedido', $3, $4)`,
         [
           id_usuario,
           emprestimo.getValorEmprestimo(),
-          `Empréstimo concedido a ${nomeCli} (#${id_emprestimo})`,
+          `Emprestimo concedido a ${nomeCli} (#${id_emprestimo})`,
           emprestimo.getDataEmprestimo(),
         ]
       );
 
       await client.query('COMMIT');
-      console.info(`[EmprestimoModel] Emprestimo cadastrado com parcelas e movimentação de caixa. ID: ${id_emprestimo}`);
+      console.info(`[EmprestimoModel] Emprestimo cadastrado com parcelas e movimentacao de caixa. ID: ${id_emprestimo}`);
       return id_emprestimo;
     } catch (error) {
       await client.query('ROLLBACK');
@@ -264,11 +281,21 @@ export default class Emprestimo {
     }
   }
 
-  static async removerEmprestimo(id_emprestimo: number): Promise<boolean> {
+  static async removerEmprestimo(id_emprestimo: number, id_usuario?: number): Promise<boolean> {
     const client = await database.connect();
 
     try {
-      // Verifica o status atual do empréstimo
+      if (id_usuario !== undefined) {
+        const checkQuery = `
+          SELECT id_emprestimo FROM Emprestimo
+          WHERE id_emprestimo = $1 AND id_usuario = $2
+        `;
+        const checkRes = await client.query(checkQuery, [id_emprestimo, id_usuario]);
+        if (checkRes.rows.length === 0) {
+          return false;
+        }
+      }
+
       const empRes = await client.query(
         `SELECT status_emprestimo FROM Emprestimo WHERE id_emprestimo = $1`,
         [id_emprestimo]
@@ -281,7 +308,6 @@ export default class Emprestimo {
       const isQuitado = empRes.rows[0].status_emprestimo === false;
 
       if (isQuitado) {
-        // Empréstimo quitado: pode excluir fisicamente tudo
         await client.query('BEGIN');
         await client.query(`DELETE FROM Parcela WHERE id_emprestimo = $1`, [id_emprestimo]);
         const res = await client.query(
@@ -292,12 +318,11 @@ export default class Emprestimo {
         return (res.rowCount ?? 0) > 0;
       }
 
-      // Empréstimo ativo: bloqueia se tiver parcelas pagas
       const pagas = await Parcela.contarPagas(id_emprestimo, client);
       if (pagas > 0) {
         throw new Error(
-          `Não é possível excluir um empréstimo com ${pagas} parcela(s) já paga(s). ` +
-          `Para remover, primeiro desfaça os pagamentos ou liquide o contrato.`
+          `Nao e possivel excluir um emprestimo com ${pagas} parcela(s) ja paga(s). ` +
+          `Para remover, primeiro desfaca os pagamentos ou liquide o contrato.`
         );
       }
 
@@ -318,14 +343,24 @@ export default class Emprestimo {
     }
   }
 
-  static async atualizarEmprestimo(emprestimo: Emprestimo): Promise<boolean> {
+  static async atualizarEmprestimo(emprestimo: Emprestimo, id_usuario?: number): Promise<boolean> {
     const client = await database.connect();
 
     try {
+      if (id_usuario !== undefined) {
+        const checkQuery = `
+          SELECT id_emprestimo FROM Emprestimo
+          WHERE id_emprestimo = $1 AND id_usuario = $2
+        `;
+        const checkRes = await client.query(checkQuery, [emprestimo.getIdEmprestimo(), id_usuario]);
+        if (checkRes.rows.length === 0) {
+          return false;
+        }
+      }
+
       const atual = await Emprestimo.listarEmprestimo(emprestimo.getIdEmprestimo());
       if (!atual) return false;
 
-      // Validar data do emprestimo
       if (!isDataValida(emprestimo.getDataEmprestimo())) {
         throw new Error('Data do emprestimo invalida.');
       }

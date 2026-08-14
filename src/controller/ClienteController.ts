@@ -2,6 +2,7 @@ import Cliente from "../model/Cliente.js";
 import { type Request, type Response } from "express";
 import logger from "../services/Logger.js";
 import { isNumeroValido } from "../services/Utilitario.js";
+import Usuario from "../model/Usuario.js";
 
 export default class ClienteController {
 
@@ -77,24 +78,34 @@ export default class ClienteController {
 
   static async cadastrar(req: Request, res: Response) {
     try {
-      const idUsuario = ClienteController.obterIdUsuario(req);
-      if (idUsuario === null) {
-        res.status(401).json({ mensagem: "Usuário não autenticado." });
+      console.log('[DEBUG] ===== INICIO CADASTRO CLIENTE =====');
+      
+      const idUsuario = (req as any).usuario?.id;
+      console.log('[DEBUG] ID do usuario do JWT:', idUsuario);
+      console.log('[DEBUG] Usuario completo:', JSON.stringify((req as any).usuario, null, 2));
+      
+      if (!idUsuario) {
+        console.log('[DEBUG] ID usuario nao encontrado no JWT');
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
         return;
       }
-
+  
       const dadosRecebidos = req.body;
-
+      console.log('[DEBUG] Dados recebidos do frontend:', JSON.stringify(dadosRecebidos, null, 2));
+  
       const nome = dadosRecebidos.nome_cliente || dadosRecebidos.nome || "";
       const sobrenome = dadosRecebidos.sobrenome_cliente || dadosRecebidos.sobrenome || "";
-
+      console.log('[DEBUG] Nome:', nome, 'Sobrenome:', sobrenome);
+  
       if (!nome.trim()) {
-        res.status(400).json({ mensagem: "Nome do cliente e obrigatorio." });
+        console.log('[DEBUG] Nome vazio');
+        res.status(400).json({ mensagem: "Nome do cliente é obrigatório." });
         return;
       }
-
+  
       const telefone = (dadosRecebidos.telefone || "").replace(/\D/g, '');
-
+      console.log('[DEBUG] Telefone limpo:', telefone);
+  
       const novoCliente = new Cliente(
         nome,
         sobrenome,
@@ -103,21 +114,38 @@ export default class ClienteController {
         dadosRecebidos.estado || "",
         dadosRecebidos.criado_em ? new Date(dadosRecebidos.criado_em) : new Date()
       );
-
+  
+      console.log('[DEBUG] Cliente criado:', {
+        nome: novoCliente.getNome(),
+        sobrenome: novoCliente.getSobrenome(),
+        telefone: novoCliente.getTelefone(),
+        cidade: novoCliente.getCidade(),
+        estado: novoCliente.getEstado(),
+        criadoEm: novoCliente.getCriadoEm()
+      });
+  
+      console.log('[DEBUG] Chamando Cliente.cadastrarCliente com idUsuario:', idUsuario);
       const id_cliente = await Cliente.cadastrarCliente(novoCliente, idUsuario);
-
+      console.log('[DEBUG] Resultado do cadastro:', id_cliente);
+  
       if (id_cliente) {
+        console.log('[DEBUG] Cliente cadastrado com sucesso! ID:', id_cliente);
         res.status(201).json({ mensagem: "Cliente cadastrado com sucesso.", id_cliente });
       } else {
-        res.status(400).json({ mensagem: "Nao foi possivel cadastrar o cliente." });
+        console.log('[DEBUG] id_cliente retornou null/undefined');
+        res.status(400).json({ mensagem: "Não foi possível cadastrar o cliente." });
       }
     } catch (error) {
+      console.error('[DEBUG] ===== ERRO NO CADASTRO =====');
+      console.error('[DEBUG] Erro completo:', error);
+      console.error('[DEBUG] Stack trace:', error instanceof Error ? error.stack : 'Sem stack');
       logger.error({ error }, "[ClienteController] Erro ao cadastrar cliente");
       res.status(500).json({
         mensagem: "Erro interno ao cadastrar o cliente."
       });
     }
   }
+  
 
   static async atualizar(req: Request, res: Response) {
     try {

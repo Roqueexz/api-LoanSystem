@@ -65,11 +65,17 @@ export default class Cliente {
     };
   }
 
-  static async listarClientes(id_cliente?: number): Promise<ClienteDTO | ClienteDTO[]> {
+  static async listarClientes(
+    id_usuario: number,
+    id_cliente?: number,
+  ): Promise<ClienteDTO | ClienteDTO[]> {
     try {
       if (typeof id_cliente === "number") {
-        const querySelectCliente = `SELECT * FROM Cliente WHERE id_cliente = $1`;
-        const respostaBD = await database.query(querySelectCliente, [id_cliente]);
+        const querySelectCliente = `
+          SELECT * FROM Cliente
+          WHERE id_cliente = $1 AND id_usuario = $2
+        `;
+        const respostaBD = await database.query(querySelectCliente, [id_cliente, id_usuario]);
 
         if (respostaBD.rows.length === 0) {
           throw new Error(`Cliente com ID ${id_cliente} não encontrado.`);
@@ -78,8 +84,12 @@ export default class Cliente {
         return Cliente.toDTO(respostaBD.rows[0]);
       }
 
-      const queryAll = `SELECT * FROM Cliente WHERE status_cliente = TRUE`;
-      const respostaAll = await database.query(queryAll);
+      const queryAll = `
+        SELECT * FROM Cliente
+        WHERE id_usuario = $1 AND status_cliente = TRUE
+        ORDER BY id_cliente DESC
+      `;
+      const respostaAll = await database.query(queryAll, [id_usuario]);
       return respostaAll.rows.map((r: any) => Cliente.toDTO(r));
     } catch (error) {
       console.error(`[ClienteModel] Erro ao buscar cliente(s):`, error);
@@ -87,8 +97,8 @@ export default class Cliente {
     }
   }
 
-  static async obterResumo(id_cliente: number): Promise<ResumoClienteDTO> {
-    const cliente = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
+  static async obterResumo(id_cliente: number, id_usuario: number): Promise<ResumoClienteDTO> {
+    const cliente = (await Cliente.listarClientes(id_usuario, id_cliente)) as ClienteDTO;
     const emprestimos = await Emprestimo.listarEmprestimos('todos', id_cliente);
 
     const emprestimosComParcelas = await Promise.all(
@@ -128,15 +138,16 @@ export default class Cliente {
     };
   }
 
-  static async cadastrarCliente(cliente: Cliente): Promise<number> {
+  static async cadastrarCliente(cliente: Cliente, id_usuario: number): Promise<number> {
     try {
       const queryInsertCliente = `
-        INSERT INTO Cliente (nome, sobrenome, telefone, cidade, estado, criado_em)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO Cliente (id_usuario, nome, sobrenome, telefone, cidade, estado, criado_em)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id_cliente;
       `;
 
       const valores = [
+        id_usuario,
         cliente.getNome(),
         cliente.getSobrenome(),
         cliente.getTelefone(),
@@ -151,7 +162,7 @@ export default class Cliente {
       }
 
       const id_cliente = result.rows[0].id_cliente as number;
-      console.info(`[ClienteModel] Cliente cadastrado com sucesso. ID: ${id_cliente}`);
+      console.info(`[ClienteModel] Cliente cadastrado com sucesso. ID: ${id_cliente}, usuario: ${id_usuario}`);
       return id_cliente;
     } catch (error) {
       console.error(`[ClienteModel] Erro ao cadastrar cliente:`, error);
@@ -159,11 +170,11 @@ export default class Cliente {
     }
   }
 
-  static async removerCliente(id_cliente: number): Promise<boolean> {
+  static async removerCliente(id_cliente: number, id_usuario: number): Promise<boolean> {
     const client = await database.connect();
 
     try {
-      const cliente: ClienteDTO = (await Cliente.listarClientes(id_cliente)) as ClienteDTO;
+      const cliente: ClienteDTO = (await Cliente.listarClientes(id_usuario, id_cliente)) as ClienteDTO;
 
       if (!cliente.status_cliente) {
         return false;
@@ -173,9 +184,9 @@ export default class Cliente {
         SELECT COUNT(*)::int AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE e.id_cliente = $1 AND p.status_parcela = 'pago'
+        WHERE e.id_cliente = $1 AND e.id_usuario = $2 AND p.status_parcela = 'pago'
       `;
-      const resultPagas = await client.query(queryPagas, [id_cliente]);
+      const resultPagas = await client.query(queryPagas, [id_cliente, id_usuario]);
       const pagas = resultPagas.rows[0]?.total ?? 0;
 
       if (pagas > 0) {
@@ -190,13 +201,13 @@ export default class Cliente {
       await Parcela.excluirPendentesPorCliente(id_cliente, client);
 
       await client.query(
-        `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_cliente = $1`,
-        [id_cliente]
+        `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_cliente = $1 AND id_usuario = $2`,
+        [id_cliente, id_usuario]
       );
 
       const result = await client.query(
-        `UPDATE Cliente SET status_cliente = FALSE WHERE id_cliente = $1`,
-        [id_cliente]
+        `UPDATE Cliente SET status_cliente = FALSE WHERE id_cliente = $1 AND id_usuario = $2`,
+        [id_cliente, id_usuario]
       );
 
       await client.query("COMMIT");
@@ -210,9 +221,12 @@ export default class Cliente {
     }
   }
 
-  static async atualizarCliente(cliente: Cliente): Promise<boolean> {
+  static async atualizarCliente(cliente: Cliente, id_usuario: number): Promise<boolean> {
     try {
-      const clienteConsulta: ClienteDTO = (await Cliente.listarClientes(cliente.getIdCliente())) as ClienteDTO;
+      const clienteConsulta: ClienteDTO = (await Cliente.listarClientes(
+        id_usuario,
+        cliente.getIdCliente(),
+      )) as ClienteDTO;
 
       if (!clienteConsulta.status_cliente) {
         return false;
@@ -225,7 +239,7 @@ export default class Cliente {
             telefone = $3,
             cidade = $4,
             estado = $5
-        WHERE id_cliente = $6
+        WHERE id_cliente = $6 AND id_usuario = $7
       `;
 
       const valores = [
@@ -235,6 +249,7 @@ export default class Cliente {
         cliente.getCidade(),
         cliente.getEstado(),
         cliente.getIdCliente(),
+        id_usuario,
       ];
 
       const respostaBD = await database.query(queryAtualizarCliente, valores);

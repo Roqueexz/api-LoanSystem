@@ -22,7 +22,6 @@ export class Auth {
     static async validacaoUsuario(req: Request, res: Response): Promise<any> {
         const { email, senha } = req.body;
 
-        // Validar email e senha com Utilitario
         if (!email || !senha) {
             logger.warn({ email }, 'Tentativa de login sem email ou senha');
             return res.status(400).json({
@@ -31,7 +30,6 @@ export class Auth {
             });
         }
 
-        // Validar formato do email
         if (!isEmailValido(email)) {
             logger.warn({ email }, 'Tentativa de login com email invalido');
             return res.status(400).json({
@@ -40,7 +38,6 @@ export class Auth {
             });
         }
 
-        // Validar tamanho minimo da senha
         if (!isStringValida(senha) || senha.length < 6) {
             logger.warn({ email }, 'Tentativa de login com senha muito curta');
             return res.status(400).json({
@@ -82,6 +79,8 @@ export class Auth {
                 usuario.role
             );
 
+            console.log('[DEBUG AUTH] Login realizado com sucesso. ID:', usuario.id_usuario, 'Email:', usuario.email);
+
             logger.info({ userId: usuario.id_usuario, email: usuario.email }, 'Login realizado com sucesso');
 
             return res.status(200).json({
@@ -100,6 +99,7 @@ export class Auth {
     }
 
     static generateToken(id: number, nome: string, email: string, role: string): string {
+        console.log('[DEBUG AUTH] Gerando token para ID:', id, 'Role:', role);
         return jwt.sign(
             { id, nome, email, role },
             SECRET,
@@ -162,9 +162,12 @@ export class Auth {
                 });
             }
 
-            // Checagem de segurança em tempo real no DB se a conta do usuário está ativa
+            console.log('[DEBUG AUTH] Token verificado - ID do usuario:', id);
+
             try {
                 const usuario = await Usuario.buscarPorId(id);
+                console.log('[DEBUG AUTH] Usuario encontrado no DB:', usuario ? 'Sim' : 'Nao');
+                
                 if (!usuario || usuario.ativo === false) {
                     logger.warn({ id }, 'Acesso negado: conta suspensa ou inexistente');
                     return res.status(403).json({
@@ -172,8 +175,10 @@ export class Auth {
                         auth: false
                     });
                 }
-                // Garante role atualizado a partir do DB
+
                 (req as any).usuario = { ...(decoded as JwtPayload), role: usuario.role };
+                console.log('[DEBUG AUTH] Usuario injetado no req:', (req as any).usuario);
+                
                 next();
             } catch (dbErr) {
                 logger.error({ dbErr, id }, 'Erro ao verificar status do usuario no middleware Auth');

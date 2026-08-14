@@ -209,80 +209,86 @@ export default class Parcela {
     }
   }
 
-  static async marcarComoPaga(id_parcela: number, data_pagamento?: Date, id_usuario: number = 1): Promise<boolean> {
-    const client = await database.connect();
+ static async marcarComoPaga(id_parcela: number, data_pagamento?: Date, id_usuario: number = 1): Promise<boolean> {
+  console.log('[DEBUG] marcarComoPaga - id_parcela:', id_parcela, 'id_usuario:', id_usuario);
+  const client = await database.connect();
 
-    try {
-      await client.query('BEGIN');
+  try {
+    await client.query('BEGIN');
 
-      const infoRes = await client.query(
-        `SELECT p.numero_parcela, p.valor_esperado, e.id_emprestimo, e.num_parcelas, c.nome, c.sobrenome
-         FROM Parcela p
-         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-         JOIN Cliente c ON e.id_cliente = c.id_cliente
-         WHERE p.id_parcela = $1`,
-        [id_parcela]
+    const infoRes = await client.query(
+      `SELECT p.numero_parcela, p.valor_esperado, e.id_emprestimo, e.num_parcelas, c.nome, c.sobrenome
+       FROM Parcela p
+       JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+       JOIN Cliente c ON e.id_cliente = c.id_cliente
+       WHERE p.id_parcela = $1`,
+      [id_parcela]
+    );
+    console.log('[DEBUG] marcarComoPaga - infoRes:', infoRes.rows);
+
+    const dtPagto = data_pagamento ?? new Date();
+
+    const atualizarParcela = `
+      UPDATE Parcela
+      SET status_parcela = 'PAGA',
+          data_pagamento = $2,
+          valor_pago = valor_esperado
+      WHERE id_parcela = $1
+      RETURNING id_emprestimo
+    `;
+
+    const updateRes = await client.query(atualizarParcela, [id_parcela, dtPagto]);
+    console.log('[DEBUG] marcarComoPaga - updateRes:', updateRes);
+
+    if ((updateRes.rowCount ?? 0) === 0) {
+      console.log('[DEBUG] marcarComoPaga - nenhuma linha atualizada');
+      await client.query('ROLLBACK');
+      return false;
+    }
+
+    const id_emprestimo = updateRes.rows[0].id_emprestimo;
+
+    if (infoRes.rows.length > 0) {
+      const info = infoRes.rows[0];
+      const nomeCliente = `${info.nome} ${info.sobrenome}`;
+      const desc = `Recebimento da Parcela ${info.numero_parcela}/${info.num_parcelas} do Emprestimo #${id_emprestimo} - ${nomeCliente}`;
+
+      console.log('[DEBUG] marcarComoPaga - inserindo movimentacao:', { id_usuario, valor: Number(info.valor_esperado), desc });
+      
+      await client.query(
+        `INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)
+         VALUES ($1, 'entrada', $2, 'Emprestimo - Recebimento', $3, $4)`,
+        [id_usuario, Number(info.valor_esperado), desc, dtPagto]
       );
+    }
 
-      const dtPagto = data_pagamento ?? new Date();
+    const parcelasNaoPagas = await client.query(
+      `SELECT COUNT(*)::int AS total
+       FROM Parcela
+       WHERE id_emprestimo = $1 AND status_parcela != 'PAGA'`,
+      [id_emprestimo]
+    );
+    console.log('[DEBUG] marcarComoPaga - parcelasNaoPagas:', parcelasNaoPagas.rows[0]?.total);
 
-      const atualizarParcela = `
-        UPDATE Parcela
-        SET status_parcela = 'PAGA',
-            data_pagamento = $2,
-            valor_pago = valor_esperado
-        WHERE id_parcela = $1
-        RETURNING id_emprestimo
-      `;
-
-      const updateRes = await client.query(atualizarParcela, [
-        id_parcela,
-        dtPagto,
-      ]);
-
-      if ((updateRes.rowCount ?? 0) === 0) {
-        await client.query('ROLLBACK');
-        return false;
-      }
-
-      const id_emprestimo = updateRes.rows[0].id_emprestimo;
-
-      if (infoRes.rows.length > 0) {
-        const info = infoRes.rows[0];
-        const nomeCliente = `${info.nome} ${info.sobrenome}`;
-        const desc = `Recebimento da Parcela ${info.numero_parcela}/${info.num_parcelas} do Emprestimo #${id_emprestimo} - ${nomeCliente}`;
-
-        await client.query(
-          `INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)
-           VALUES ($1, 'entrada', $2, 'Emprestimo - Recebimento', $3, $4)`,
-          [id_usuario, Number(info.valor_esperado), desc, dtPagto]
-        );
-      }
-
-      const parcelasNaoPagas = await client.query(
-        `SELECT COUNT(*)::int AS total
-         FROM Parcela
-         WHERE id_emprestimo = $1 AND status_parcela != 'PAGA'`,
+    if ((parcelasNaoPagas.rows[0]?.total ?? 0) === 0) {
+      console.log('[DEBUG] marcarComoPaga - todas as parcelas pagas, atualizando status do emprestimo');
+      await client.query(
+        `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_emprestimo = $1`,
         [id_emprestimo]
       );
-
-      if ((parcelasNaoPagas.rows[0]?.total ?? 0) === 0) {
-        await client.query(
-          `UPDATE Emprestimo SET status_emprestimo = FALSE WHERE id_emprestimo = $1`,
-          [id_emprestimo]
-        );
-      }
-
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error(`[ParcelaModel] Erro ao dar baixa na parcela (id: ${id_parcela}):`, error);
-      throw error;
-    } finally {
-      client.release();
     }
+
+    await client.query('COMMIT');
+    console.log('[DEBUG] marcarComoPaga - sucesso!');
+    return true;
+  } catch (error) {
+    console.error('[DEBUG] marcarComoPaga - erro:', error);
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
+}
 
   static async desfazerPagamento(id_parcela: number, id_usuario: number = 1): Promise<boolean> {
     const client = await database.connect();

@@ -97,49 +97,61 @@ export default class ParcelaController {
   }
 
   static async pagar(req: Request, res: Response) {
-    try {
-      const idUsuario = ParcelaController.obterIdUsuario(req);
-      if (idUsuario === null) {
-        res.status(401).json({ mensagem: "Usuario nao autenticado." });
-        return;
-      }
-
-      const id_parcela = parseInt(req.params.id as string);
-      
-      if (!isNumeroValido(id_parcela)) {
-        res.status(400).json({ mensagem: "ID da parcela invalido." });
-        return;
-      }
-
-      // Verificar se a parcela pertence ao usuário via JOIN com emprestimo
-      const checkQuery = `
-        SELECT p.id_parcela FROM Parcela p
-        JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.id_parcela = $1 AND e.id_usuario = $2
-      `;
-      const checkRes = await database.query(checkQuery, [id_parcela, idUsuario]);
-      if (checkRes.rows.length === 0) {
-        res.status(403).json({ mensagem: "Acesso negado. Esta parcela nao pertence a este credor." });
-        return;
-      }
-
-      const dataPagamento = req.body?.data_pagamento
-        ? new Date(req.body.data_pagamento)
-        : undefined;
-
-      const result = await Parcela.marcarComoPaga(id_parcela, dataPagamento, idUsuario);
-
-      if (result) {
-        res.status(200).json({ mensagem: "Parcela paga com sucesso." });
-      } else {
-        res.status(404).json({ mensagem: "Parcela nao encontrada." });
-      }
-    } catch (error) {
-      logger.error({ error, id: req.params.id }, "[ParcelaController] Erro ao dar baixa na parcela");
-      res.status(500).json({ mensagem: "Erro interno ao dar baixa na parcela." });
+  try {
+    const idUsuario = ParcelaController.obterIdUsuario(req);
+    console.log('[DEBUG] pagar - idUsuario:', idUsuario);
+    
+    if (idUsuario === null) {
+      res.status(401).json({ mensagem: "Usuario nao autenticado." });
+      return;
     }
-  }
 
+    const id_parcela = parseInt(req.params.id as string);
+    console.log('[DEBUG] pagar - id_parcela:', id_parcela);
+    
+    if (!isNumeroValido(id_parcela)) {
+      res.status(400).json({ mensagem: "ID da parcela invalido." });
+      return;
+    }
+
+    const checkQuery = `
+      SELECT p.id_parcela, e.id_usuario 
+      FROM Parcela p
+      JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+      WHERE p.id_parcela = $1
+    `;
+    const checkRes = await database.query(checkQuery, [id_parcela]);
+    console.log('[DEBUG] pagar - checkRes:', checkRes.rows);
+    
+    if (checkRes.rows.length === 0) {
+      res.status(404).json({ mensagem: "Parcela nao encontrada." });
+      return;
+    }
+
+    if (checkRes.rows[0].id_usuario !== idUsuario) {
+      console.log('[DEBUG] pagar - ownership mismatch. Parcela usuario:', checkRes.rows[0].id_usuario, 'Credor:', idUsuario);
+      res.status(403).json({ mensagem: "Acesso negado. Esta parcela nao pertence a este credor." });
+      return;
+    }
+
+    const dataPagamento = req.body?.data_pagamento
+      ? new Date(req.body.data_pagamento)
+      : undefined;
+
+    const result = await Parcela.marcarComoPaga(id_parcela, dataPagamento, idUsuario);
+    console.log('[DEBUG] pagar - result:', result);
+
+    if (result) {
+      res.status(200).json({ mensagem: "Parcela paga com sucesso." });
+    } else {
+      res.status(404).json({ mensagem: "Parcela nao encontrada." });
+    }
+  } catch (error) {
+    console.error('[DEBUG] pagar - erro:', error);
+    logger.error({ error, id: req.params.id }, "[ParcelaController] Erro ao dar baixa na parcela");
+    res.status(500).json({ mensagem: "Erro interno ao dar baixa na parcela." });
+  }
+}
   static async desfazer(req: Request, res: Response) {
     try {
       const idUsuario = ParcelaController.obterIdUsuario(req);

@@ -17,10 +17,10 @@ export default class Caixa {
       const totalEmprestado = Number(resEmprestado.rows[0]?.total || 0);
 
       const queryTotalRecebido = `
-        SELECT COALESCE(SUM(p.valor_pago), 0) AS total
+        SELECT COALESCE(SUM(COALESCE(p.valor_pago, p.valor_esperado)), 0) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.status_parcela = 'PAGA' AND e.id_usuario = $1
+        WHERE (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL) AND e.id_usuario = $1
       `;
       const resRecebido = await database.query(queryTotalRecebido, [id_usuario]);
       const totalRecebido = Number(resRecebido.rows[0]?.total || 0);
@@ -28,7 +28,7 @@ export default class Caixa {
       const queryPendente = `
         SELECT COALESCE(SUM(
             e.valor_emprestimo - COALESCE(
-                (SELECT SUM(valor_pago) FROM Parcela p WHERE p.id_emprestimo = e.id_emprestimo AND p.status_parcela = 'PAGA'), 0
+                (SELECT SUM(COALESCE(valor_pago, valor_esperado)) FROM Parcela p WHERE p.id_emprestimo = e.id_emprestimo AND (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL)), 0
             )
         ), 0) AS total
         FROM Emprestimo e
@@ -38,11 +38,11 @@ export default class Caixa {
       const entradaPendente = Number(resPendente.rows[0]?.total || 0);
 
       const queryAtrasado = `
-        SELECT COALESCE(SUM(p.valor_esperado - p.valor_pago), 0) AS total
+        SELECT COALESCE(SUM(p.valor_esperado - COALESCE(p.valor_pago, 0)), 0) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.status_parcela = 'pendente'
-        AND p.data_vencimento < CURRENT_DATE
+        WHERE (LOWER(p.status_parcela) IN ('pendente', 'atrasada', 'atrasado') OR p.data_pagamento IS NULL)
+        AND DATE(p.data_vencimento) < CURRENT_DATE
         AND e.id_usuario = $1
       `;
       const resAtrasado = await database.query(queryAtrasado, [id_usuario]);
@@ -108,11 +108,11 @@ export default class Caixa {
       const dataStr = formatarDataISO(dataBase);
 
       const queryRecebido = `
-        SELECT COALESCE(SUM(p.valor_pago), 0) AS total
+        SELECT COALESCE(SUM(COALESCE(p.valor_pago, p.valor_esperado)), 0) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.data_pagamento = $1
-        AND p.status_parcela = 'PAGA'
+        WHERE DATE(p.data_pagamento) = $1
+        AND (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL)
         AND e.id_usuario = $2
       `;
       const resRecebido = await database.query(queryRecebido, [dataStr, id_usuario]);
@@ -121,7 +121,7 @@ export default class Caixa {
       const queryEmprestado = `
         SELECT COALESCE(SUM(e.valor_emprestimo), 0) AS total
         FROM Emprestimo e
-        WHERE e.data_emprestimo = $1 AND e.id_usuario = $2
+        WHERE DATE(e.data_emprestimo) = $1 AND e.id_usuario = $2
       `;
       const resEmprestado = await database.query(queryEmprestado, [dataStr, id_usuario]);
       const emprestado = Number(resEmprestado.rows[0]?.total || 0);
@@ -130,8 +130,8 @@ export default class Caixa {
         SELECT COUNT(*) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.data_vencimento = $1
-        AND p.status_parcela = 'pendente'
+        WHERE DATE(p.data_vencimento) = $1
+        AND (LOWER(p.status_parcela) IN ('pendente', 'atrasada', 'atrasado') OR p.data_pagamento IS NULL)
         AND e.id_usuario = $2
       `;
       const resVencendo = await database.query(queryVencendo, [dataStr, id_usuario]);
@@ -141,8 +141,8 @@ export default class Caixa {
         SELECT COUNT(*) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.data_vencimento < $1
-        AND p.status_parcela = 'pendente'
+        WHERE DATE(p.data_vencimento) < $1
+        AND (LOWER(p.status_parcela) IN ('pendente', 'atrasada', 'atrasado') OR p.data_pagamento IS NULL)
         AND e.id_usuario = $2
       `;
       const resAtrasadas = await database.query(queryAtrasadas, [dataStr, id_usuario]);
@@ -175,11 +175,11 @@ export default class Caixa {
       const dataFim = `${anoBase}-${String(mesBase).padStart(2, "0")}-${String(ultimoDia).padStart(2, "0")}`;
 
       const queryRecebido = `
-        SELECT COALESCE(SUM(p.valor_pago), 0) AS total
+        SELECT COALESCE(SUM(COALESCE(p.valor_pago, p.valor_esperado)), 0) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.data_pagamento BETWEEN $1 AND $2
-        AND p.status_parcela = 'PAGA'
+        WHERE DATE(p.data_pagamento) BETWEEN $1 AND $2
+        AND (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL)
         AND e.id_usuario = $3
       `;
       const resRecebido = await database.query(queryRecebido, [
@@ -192,7 +192,7 @@ export default class Caixa {
       const queryEmprestado = `
         SELECT COALESCE(SUM(e.valor_emprestimo), 0) AS total
         FROM Emprestimo e
-        WHERE e.data_emprestimo BETWEEN $1 AND $2
+        WHERE DATE(e.data_emprestimo) BETWEEN $1 AND $2
         AND e.id_usuario = $3
       `;
       const resEmprestado = await database.query(queryEmprestado, [
@@ -209,11 +209,11 @@ export default class Caixa {
       const dataFimAnt = `${anoAnterior}-${String(mesAnterior).padStart(2, "0")}-${String(ultimoDiaAnt).padStart(2, "0")}`;
 
       const queryMesAnterior = `
-        SELECT COALESCE(SUM(p.valor_pago), 0) AS total
+        SELECT COALESCE(SUM(COALESCE(p.valor_pago, p.valor_esperado)), 0) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.data_pagamento BETWEEN $1 AND $2
-        AND p.status_parcela = 'PAGA'
+        WHERE DATE(p.data_pagamento) BETWEEN $1 AND $2
+        AND (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL)
         AND e.id_usuario = $3
       `;
       const resMesAnterior = await database.query(queryMesAnterior, [
@@ -258,11 +258,11 @@ export default class Caixa {
         const dataFim = `${anoBase}-${String(mes).padStart(2, "0")}-${String(ultimoDia).padStart(2, "0")}`;
 
         const queryRecebido = `
-          SELECT COALESCE(SUM(p.valor_pago), 0) AS total
+          SELECT COALESCE(SUM(COALESCE(p.valor_pago, p.valor_esperado)), 0) AS total
           FROM Parcela p
           JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-          WHERE p.data_pagamento BETWEEN $1 AND $2
-          AND p.status_parcela = 'PAGA'
+          WHERE DATE(p.data_pagamento) BETWEEN $1 AND $2
+          AND (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL)
           AND e.id_usuario = $3
         `;
         const resRecebido = await database.query(queryRecebido, [
@@ -275,7 +275,7 @@ export default class Caixa {
         const queryEmprestado = `
           SELECT COALESCE(SUM(e.valor_emprestimo), 0) AS total
           FROM Emprestimo e
-          WHERE e.data_emprestimo BETWEEN $1 AND $2
+          WHERE DATE(e.data_emprestimo) BETWEEN $1 AND $2
           AND e.id_usuario = $3
         `;
         const resEmprestado = await database.query(queryEmprestado, [
@@ -316,8 +316,8 @@ export default class Caixa {
 
       const querySaldoDisponivel = `
         SELECT 
-            COALESCE(SUM(CASE WHEN p.status_parcela = 'PAGA' THEN p.valor_pago ELSE 0 END), 0) AS recebido,
-            COALESCE(SUM(CASE WHEN p.status_parcela = 'PAGA' THEN 0 ELSE p.valor_esperado END), 0) AS pendente
+            COALESCE(SUM(CASE WHEN (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL) THEN COALESCE(p.valor_pago, p.valor_esperado) ELSE 0 END), 0) AS recebido,
+            COALESCE(SUM(CASE WHEN (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL) THEN 0 ELSE p.valor_esperado END), 0) AS pendente
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
         WHERE e.id_usuario = $1
@@ -331,8 +331,8 @@ export default class Caixa {
         SELECT COALESCE(SUM(p.valor_esperado), 0) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.data_vencimento BETWEEN $1 AND $2
-        AND p.status_parcela = 'pendente'
+        WHERE DATE(p.data_vencimento) BETWEEN $1 AND $2
+        AND (LOWER(p.status_parcela) IN ('pendente', 'atrasada', 'atrasado') OR p.data_pagamento IS NULL)
         AND e.id_usuario = $3
       `;
       const resReservado = await database.query(querySaldoReservado, [
@@ -343,11 +343,11 @@ export default class Caixa {
       const saldoReservado = Number(resReservado.rows[0]?.total || 0);
 
       const queryReceitasMes = `
-        SELECT COALESCE(SUM(p.valor_pago), 0) AS total
+        SELECT COALESCE(SUM(COALESCE(p.valor_pago, p.valor_esperado)), 0) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.data_pagamento BETWEEN $1 AND $2
-        AND p.status_parcela = 'PAGA'
+        WHERE DATE(p.data_pagamento) BETWEEN $1 AND $2
+        AND (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL)
         AND e.id_usuario = $3
       `;
       const resReceitas = await database.query(queryReceitasMes, [
@@ -360,7 +360,7 @@ export default class Caixa {
       const queryDespesasMes = `
         SELECT COALESCE(SUM(e.valor_emprestimo), 0) AS total
         FROM Emprestimo e
-        WHERE e.data_emprestimo BETWEEN $1 AND $2
+        WHERE DATE(e.data_emprestimo) BETWEEN $1 AND $2
         AND e.id_usuario = $3
       `;
       const resDespesas = await database.query(queryDespesasMes, [
@@ -376,8 +376,8 @@ export default class Caixa {
         SELECT COUNT(*) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.data_pagamento = $1
-        AND p.status_parcela = 'PAGA'
+        WHERE DATE(p.data_pagamento) = $1
+        AND (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL)
         AND e.id_usuario = $2
       `;
       const resParcelasHoje = await database.query(queryParcelasHoje, [
@@ -390,8 +390,8 @@ export default class Caixa {
         SELECT COUNT(*) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.data_vencimento < $1
-        AND p.status_parcela = 'pendente'
+        WHERE DATE(p.data_vencimento) < $1
+        AND (LOWER(p.status_parcela) IN ('pendente', 'atrasada', 'atrasado') OR p.data_pagamento IS NULL)
         AND e.id_usuario = $2
       `;
       const resParcelasAtrasadas = await database.query(
@@ -406,8 +406,8 @@ export default class Caixa {
         SELECT COUNT(DISTINCT e.id_cliente) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.data_vencimento < $1
-        AND p.status_parcela = 'pendente'
+        WHERE DATE(p.data_vencimento) < $1
+        AND (LOWER(p.status_parcela) IN ('pendente', 'atrasada', 'atrasado') OR p.data_pagamento IS NULL)
         AND e.status_emprestimo = TRUE
         AND e.id_usuario = $2
       `;
@@ -422,11 +422,11 @@ export default class Caixa {
       const queryReceitasPorDia = `
         SELECT 
             p.data_pagamento,
-            COALESCE(SUM(p.valor_pago), 0) AS total
+            COALESCE(SUM(COALESCE(p.valor_pago, p.valor_esperado)), 0) AS total
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
-        WHERE p.data_pagamento >= $1
-        AND p.status_parcela = 'PAGA'
+        WHERE DATE(p.data_pagamento) >= $1
+        AND (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL)
         AND e.id_usuario = $2
         GROUP BY p.data_pagamento
         ORDER BY p.data_pagamento
@@ -499,7 +499,7 @@ export default class Caixa {
       const queryInadimplencia = `
         SELECT 
             COUNT(*) AS totalParcelas,
-            COALESCE(SUM(CASE WHEN p.status_parcela = 'pendente' AND p.data_vencimento < $1 THEN 1 ELSE 0 END), 0) AS parcelasAtrasadas
+            COALESCE(SUM(CASE WHEN (LOWER(p.status_parcela) IN ('pendente', 'atrasada', 'atrasado') OR p.data_pagamento IS NULL) AND DATE(p.data_vencimento) < $1 THEN 1 ELSE 0 END), 0) AS parcelasAtrasadas
         FROM Parcela p
         JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
         WHERE e.id_usuario = $2

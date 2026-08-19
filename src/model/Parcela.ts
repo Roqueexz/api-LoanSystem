@@ -230,7 +230,7 @@ export default class Parcela {
 
     const atualizarParcela = `
       UPDATE Parcela
-      SET status_parcela = 'PAGA',
+      SET status_parcela = 'pago',
           data_pagamento = $2,
           valor_pago = valor_esperado
       WHERE id_parcela = $1
@@ -265,7 +265,7 @@ export default class Parcela {
     const parcelasNaoPagas = await client.query(
       `SELECT COUNT(*)::int AS total
        FROM Parcela
-       WHERE id_emprestimo = $1 AND status_parcela != 'PAGA'`,
+       WHERE id_emprestimo = $1 AND (LOWER(status_parcela) NOT IN ('pago', 'paga') AND data_pagamento IS NULL)`,
       [id_emprestimo]
     );
     console.log('[DEBUG] marcarComoPaga - parcelasNaoPagas:', parcelasNaoPagas.rows[0]?.total);

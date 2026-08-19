@@ -69,6 +69,7 @@ export default class Emprestimo {
   private static toDTO(row: any): EmprestimoDTO {
     return {
       id_emprestimo: row.id_emprestimo,
+      id_usuario: row.id_usuario ? Number(row.id_usuario) : undefined,
       id_cliente: row.id_cliente,
       nome_cliente: row.nome_cliente,
       sobrenome_cliente: row.sobrenome_cliente,
@@ -400,6 +401,37 @@ export default class Emprestimo {
               [primeiraParcela.valor_parcela, emprestimo.getIdEmprestimo()]
             );
           }
+        }
+      }
+
+      // Se o status mudou para quitado (status_emprestimo === false), quitar parcelas pendentes e registrar entradas
+      if (atual.status_emprestimo === true && (emprestimo.getStatusEmprestimo() === false)) {
+        const pendentesRes = await client.query(
+          `SELECT p.id_parcela, p.numero_parcela, p.valor_esperado, c.nome, c.sobrenome
+           FROM Parcela p
+           JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+           JOIN Cliente c ON e.id_cliente = c.id_cliente
+           WHERE p.id_emprestimo = $1 AND (LOWER(p.status_parcela) != 'pago' AND LOWER(p.status_parcela) != 'paga' AND p.data_pagamento IS NULL)`,
+          [emprestimo.getIdEmprestimo()]
+        );
+
+        const idOwner = id_usuario ?? atual.id_usuario;
+
+        for (const p of pendentesRes.rows) {
+          await client.query(
+            `UPDATE Parcela
+             SET status_parcela = 'pago', data_pagamento = CURRENT_DATE, valor_pago = valor_esperado
+             WHERE id_parcela = $1`,
+            [p.id_parcela]
+          );
+
+          const desc = `Recebimento da Parcela ${p.numero_parcela}/${emprestimo.getNumParcelas()} do Emprestimo #${emprestimo.getIdEmprestimo()} - ${p.nome} ${p.sobrenome}`;
+
+          await client.query(
+            `INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)
+             VALUES ($1, 'entrada', $2, 'Emprestimo - Quitação', $3, CURRENT_DATE)`,
+            [idOwner, Number(p.valor_esperado), desc]
+          );
         }
       }
 

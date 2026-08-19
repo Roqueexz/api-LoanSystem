@@ -102,12 +102,72 @@ export default class CaixaPessoal {
         }
     }
 
+    // ─── MOVIMENTAÇÕES: SINCRONIZAÇÃO AUTOMÁTICA DE EMPRÉSTIMOS E PARCELAS ───────
+    static async sincronizarMovimentacoesEmprestimos(id_usuario: number): Promise<void> {
+        try {
+            // 1. Sincronizar saídas de empréstimos concedidos
+            const querySaidas = `
+                INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)
+                SELECT e.id_usuario, 'saida', e.valor_emprestimo, 'Emprestimo Concedido', 
+                       CONCAT('Emprestimo concedido a ', c.nome, ' ', c.sobrenome, ' (#', e.id_emprestimo, ')'), 
+                       e.data_emprestimo
+                FROM Emprestimo e
+                JOIN Cliente c ON e.id_cliente = c.id_cliente
+                WHERE e.id_usuario = $1
+                AND NOT EXISTS (
+                  SELECT 1 FROM caixa_pessoal_movimentacao m
+                  WHERE m.id_usuario = e.id_usuario
+                  AND m.tipo = 'saida'
+                  AND m.descricao LIKE CONCAT('%#', e.id_emprestimo, '%')
+                )
+            `;
+            await database.query(querySaidas, [id_usuario]);
+
+            // 2. Se houver empréstimos quitados (status_emprestimo = FALSE), garantir que parcelas pendentes fiquem pagas
+            await database.query(`
+                UPDATE Parcela
+                SET status_parcela = 'pago',
+                    data_pagamento = COALESCE(data_pagamento, CURRENT_DATE),
+                    valor_pago = valor_esperado
+                WHERE id_emprestimo IN (
+                    SELECT id_emprestimo FROM Emprestimo WHERE id_usuario = $1 AND status_emprestimo = FALSE
+                )
+                AND (LOWER(status_parcela) != 'pago' AND LOWER(status_parcela) != 'paga' AND data_pagamento IS NULL)
+            `, [id_usuario]);
+
+            // 3. Sincronizar entradas de parcelas pagas
+            const queryEntradas = `
+                INSERT INTO caixa_pessoal_movimentacao (id_usuario, tipo, valor, categoria, descricao, data)
+                SELECT e.id_usuario, 'entrada', COALESCE(p.valor_pago, p.valor_esperado), 'Emprestimo - Recebimento',
+                       CONCAT('Recebimento da Parcela ', p.numero_parcela, '/', e.num_parcelas, ' do Emprestimo #', e.id_emprestimo, ' - ', c.nome, ' ', c.sobrenome),
+                       COALESCE(p.data_pagamento, CURRENT_DATE)
+                FROM Parcela p
+                JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+                JOIN Cliente c ON e.id_cliente = c.id_cliente
+                WHERE e.id_usuario = $1
+                AND (LOWER(p.status_parcela) IN ('pago', 'paga') OR p.data_pagamento IS NOT NULL)
+                AND NOT EXISTS (
+                  SELECT 1 FROM caixa_pessoal_movimentacao m
+                  WHERE m.id_usuario = e.id_usuario
+                  AND m.tipo = 'entrada'
+                  AND m.descricao LIKE CONCAT('%Parcela ', p.numero_parcela, '/%#', e.id_emprestimo, '%')
+                )
+            `;
+            await database.query(queryEntradas, [id_usuario]);
+        } catch (error) {
+            logger.warn({ error, id_usuario }, '[CaixaPessoal] Erro ao sincronizar movimentações automáticas');
+        }
+    }
+
     // ─── MOVIMENTAÇÕES: LISTAR ─────────────────────────────────────────
     static async listarMovimentacoes(
         id_usuario: number,
         filtros?: { tipo?: string; categoria?: string }
     ): Promise<MovimentacaoDTO[]> {
         try {
+            // Garante que todas as entradas e saídas de empréstimos estejam registradas
+            await CaixaPessoal.sincronizarMovimentacoesEmprestimos(id_usuario);
+
             let query = `
                 SELECT id_movimentacao, tipo, valor, categoria, descricao, 
                        TO_CHAR(data, 'YYYY-MM-DD') as data, criado_em

@@ -27,6 +27,7 @@ import { ContaSchema } from "./schemas/ContaSchema.js";
 import { MetaSchema, MetaUpdateSchema } from "./schemas/MetaSchema.js";
 import { AtualizarPerfilSchema, AlterarSenhaSchema } from "./schemas/UsuarioSchema.js";
 import { CaixinhaSchema, ValorCaixinhaSchema } from "./schemas/CaixinhaSchema.js";
+import { SaldoSchema } from "./schemas/SaldoSchema.js";
 
 const router = Router();
 const authController = new AuthController();
@@ -122,6 +123,11 @@ router.get(
   "/api/emprestimos/:id/parcelas",
   Auth.verifyToken,
   ParcelaController.porEmprestimo,
+);
+router.get(
+  "/api/parcelas/vencendo",
+  Auth.verifyToken,
+  ParcelaController.vencendoNoMes,
 );
 router.get("/api/parcelas/:id", Auth.verifyToken, ParcelaController.parcela);
 router.patch(
@@ -221,6 +227,17 @@ router.patch(
 // ============================================
 // ROTAS DO CAIXA PESSOAL
 // ============================================
+router.get(
+  "/api/caixa-pessoal/saldo",
+  Auth.verifyToken,
+  CaixaPessoalController.obterSaldo,
+);
+router.put(
+  "/api/caixa-pessoal/saldo",
+  Auth.verifyToken,
+  validate(SaldoSchema),
+  CaixaPessoalController.atualizarSaldo,
+);
 router.get(
   "/api/caixa-pessoal/cofre",
   Auth.verifyToken,

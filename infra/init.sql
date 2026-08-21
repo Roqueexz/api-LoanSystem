@@ -19,6 +19,7 @@ DROP TABLE IF EXISTS caixa_pessoal_meta CASCADE;
 DROP TABLE IF EXISTS caixa_pessoal_conta CASCADE;
 DROP TABLE IF EXISTS caixa_pessoal_movimentacao CASCADE;
 DROP TABLE IF EXISTS caixa_pessoal_cofre CASCADE;
+DROP TABLE IF EXISTS caixa_pessoal CASCADE;
 DROP TABLE IF EXISTS Parcela CASCADE;
 DROP TABLE IF EXISTS Emprestimo CASCADE;
 DROP TABLE IF EXISTS Cliente CASCADE;
@@ -133,6 +134,24 @@ CREATE TABLE IF NOT EXISTS parcela (
 
 CREATE INDEX IF NOT EXISTS idx_parcela_emprestimo ON parcela(id_emprestimo);
 CREATE INDEX IF NOT EXISTS idx_parcela_vencimento ON parcela(data_vencimento);
+
+
+-- ============================================
+-- TABELA CAIXA PESSOAL — SALDO CONSOLIDADO
+-- Sincronização automática de Saldo em Conta.
+-- ============================================
+CREATE TABLE IF NOT EXISTS caixa_pessoal (
+    id_usuario      INT PRIMARY KEY,
+    saldo           NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    atualizado_em   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_caixa_pessoal_usuario
+        FOREIGN KEY (id_usuario)
+        REFERENCES usuario(id_usuario)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_caixa_pessoal_usuario ON caixa_pessoal(id_usuario);
 
 
 -- ============================================

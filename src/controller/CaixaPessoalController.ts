@@ -21,6 +21,51 @@ export default class CaixaPessoalController {
         }
     }
 
+    // ─── GET /api/caixa-pessoal/saldo ──────────────────────────────────
+    static async obterSaldo(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            const saldo = await CaixaPessoal.obterSaldo(Number(id));
+            return res.status(200).json({ saldo });
+        } catch (error) {
+            logger.error({ error }, '[CaixaPessoalController] Erro ao obter saldo');
+            return res.status(500).json({
+                mensagem: 'Erro interno ao obter saldo.'
+            });
+        }
+    }
+
+    // ─── PUT /api/caixa-pessoal/saldo ──────────────────────────────────
+    static async atualizarSaldo(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            const { saldo } = req.body;
+
+            if (saldo === undefined || typeof saldo !== 'number' || isNaN(saldo)) {
+                return res.status(400).json({
+                    mensagem: 'Campo "saldo" é obrigatório e deve ser um número válido.'
+                });
+            }
+
+            const sucesso = await CaixaPessoal.atualizarSaldo(Number(id), saldo);
+            if (!sucesso) {
+                return res.status(500).json({
+                    mensagem: 'Falha ao atualizar o saldo do cofre pessoal.'
+                });
+            }
+
+            return res.status(200).json({
+                mensagem: 'Saldo atualizado com sucesso.',
+                saldo
+            });
+        } catch (error) {
+            logger.error({ error }, '[CaixaPessoalController] Erro ao atualizar saldo');
+            return res.status(500).json({
+                mensagem: 'Erro interno ao atualizar saldo.'
+            });
+        }
+    }
+
     // ─── PATCH /api/caixa-pessoal/cofre/:valor_cedula ──────────────────
     static async atualizarCedula(req: Request, res: Response): Promise<any> {
         try {

@@ -102,6 +102,85 @@ export default class CaixaPessoal {
         }
     }
 
+    // ─── SALDO CONSOLIDADO: OBTER ──────────────────────────────────────
+    static async obterSaldo(id_usuario: number): Promise<number> {
+        try {
+            await database.query(`
+                CREATE TABLE IF NOT EXISTS caixa_pessoal (
+                    id_usuario INT PRIMARY KEY REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+                    saldo NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+                    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            const query = `SELECT saldo FROM caixa_pessoal WHERE id_usuario = $1`;
+            const res = await database.query(query, [id_usuario]);
+            if (res.rows.length > 0) {
+                return Number(res.rows[0].saldo);
+            }
+            return 0;
+        } catch (error) {
+            logger.warn({ error, id_usuario }, '[CaixaPessoal] Aviso ao obter saldo consolidado');
+            return 0;
+        }
+    }
+
+    // ─── SALDO CONSOLIDADO: ATUALIZAR ──────────────────────────────────
+    static async atualizarSaldo(id_usuario: number, saldo: number): Promise<boolean> {
+        try {
+            await database.query(`
+                CREATE TABLE IF NOT EXISTS caixa_pessoal (
+                    id_usuario INT PRIMARY KEY REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+                    saldo NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+                    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            const query = `
+                INSERT INTO caixa_pessoal (id_usuario, saldo, atualizado_em)
+                VALUES ($1, $2, CURRENT_TIMESTAMP)
+                ON CONFLICT (id_usuario)
+                DO UPDATE SET
+                    saldo = EXCLUDED.saldo,
+                    atualizado_em = CURRENT_TIMESTAMP
+                RETURNING saldo
+            `;
+            const resultado = await database.query(query, [id_usuario, saldo]);
+            const atualizado = (resultado.rowCount ?? 0) > 0;
+
+            if (atualizado) {
+                logger.info({ id_usuario, saldo }, '[CaixaPessoal] Saldo consolidado atualizado com sucesso');
+            }
+
+            return atualizado;
+        } catch (error) {
+            logger.error({ error, id_usuario, saldo }, '[CaixaPessoal] Erro ao atualizar saldo consolidado');
+            throw error;
+        }
+    }
+
+    // ─── SALDO CONSOLIDADO: RECALCULAR E SALVAR ────────────────────────
+    static async recalcularESalvarSaldo(id_usuario: number): Promise<number> {
+        try {
+            const cofre = await CaixaPessoal.obterCofre(id_usuario);
+            const movimentacoes = await CaixaPessoal.listarMovimentacoes(id_usuario);
+
+            const entradas = movimentacoes
+                .filter((m) => m.tipo === 'entrada')
+                .reduce((acc, m) => acc + Number(m.valor || 0), 0);
+
+            const saidas = movimentacoes
+                .filter((m) => m.tipo === 'saida')
+                .reduce((acc, m) => acc + Number(m.valor || 0), 0);
+
+            const novoSaldo = Number(cofre.total || 0) + entradas - saidas;
+            await CaixaPessoal.atualizarSaldo(id_usuario, novoSaldo);
+
+            return novoSaldo;
+        } catch (error) {
+            logger.warn({ error, id_usuario }, '[CaixaPessoal] Erro no recálculo automático de saldo');
+            return 0;
+        }
+    }
+
     // ─── MOVIMENTAÇÕES: SINCRONIZAÇÃO AUTOMÁTICA DE EMPRÉSTIMOS E PARCELAS ───────
     static async sincronizarMovimentacoesEmprestimos(id_usuario: number): Promise<void> {
         try {
@@ -243,6 +322,9 @@ export default class CaixaPessoal {
                 '[CaixaPessoal] Movimentação registrada'
             );
 
+            // Sincroniza o saldo consolidado de forma imediata
+            void CaixaPessoal.recalcularESalvarSaldo(id_usuario);
+
             return {
                 id_movimentacao: row.id_movimentacao,
                 tipo: row.tipo,
@@ -274,6 +356,8 @@ export default class CaixaPessoal {
 
             if (deletado) {
                 logger.info({ id_usuario, id_movimentacao }, '[CaixaPessoal] Movimentação removida');
+                // Sincroniza o saldo consolidado de forma imediata
+                void CaixaPessoal.recalcularESalvarSaldo(id_usuario);
             }
 
             return deletado;
@@ -508,6 +592,9 @@ export default class CaixaPessoal {
             }
 
             await client.query('COMMIT');
+            if (atualizado) {
+                void CaixaPessoal.recalcularESalvarSaldo(id_usuario);
+            }
             return atualizado;
         } catch (error) {
             await client.query('ROLLBACK');

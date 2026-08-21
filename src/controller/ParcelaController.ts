@@ -248,4 +248,23 @@ export default class ParcelaController {
       res.status(500).json({ mensagem: "Erro interno ao listar parcelas." });
     }
   }
+
+  static async vencendoNoMes(req: Request, res: Response) {
+    try {
+      const idUsuario = ParcelaController.obterIdUsuario(req);
+      if (idUsuario === null) {
+        res.status(401).json({ mensagem: "Usuario nao autenticado." });
+        return;
+      }
+
+      const mes = req.query.mes ? parseInt(req.query.mes as string) : undefined;
+      const ano = req.query.ano ? parseInt(req.query.ano as string) : undefined;
+
+      const parcelas = await Parcela.listarParcelasVencendoNoMes(idUsuario, mes, ano);
+      res.status(200).json(parcelas);
+    } catch (error) {
+      logger.error({ error }, "[ParcelaController] Erro ao listar parcelas vencendo no mes");
+      res.status(500).json({ mensagem: "Erro interno ao listar parcelas vencendo no mes." });
+    }
+  }
 }

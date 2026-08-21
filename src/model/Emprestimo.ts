@@ -3,6 +3,7 @@ import databaseInstance from './DatabaseModel.js';
 import Parcela from './Parcela.js';
 import Juros from '../services/Juros.js';
 import { isDataValida, formatarDataISO } from '../services/Utilitario.js';
+import CaixaPessoal from './CaixaPessoal.js';
 
 const database = databaseInstance.pool;
 
@@ -275,6 +276,7 @@ export default class Emprestimo {
 
     await client.query('COMMIT');
     console.info(`[EmprestimoModel] Emprestimo cadastrado com parcelas e movimentacao de caixa. ID: ${id_emprestimo}`);
+    void CaixaPessoal.recalcularESalvarSaldo(id_usuario);
     return id_emprestimo;
   } catch (error) {
     await client.query('ROLLBACK');
@@ -466,6 +468,8 @@ export default class Emprestimo {
 
       const res = await client.query(query, valores);
       await client.query('COMMIT');
+      const idOwner = id_usuario ?? atual.id_usuario ?? 1;
+      void CaixaPessoal.recalcularESalvarSaldo(idOwner);
       return (res.rowCount ?? 0) > 0;
     } catch (error) {
       await client.query('ROLLBACK');

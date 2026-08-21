@@ -4,6 +4,7 @@ import type EmprestimoDTO from '../interface/EmprestimoDTO.js';
 import type pg from 'pg';
 import CalculadoraFinanceira from '../services/CalculadoraFinanceira.js';
 import { adicionarMeses, isDataValida } from '../services/Utilitario.js';
+import CaixaPessoal from './CaixaPessoal.js';
 
 const database = databaseInstance.pool;
 type Executor = pg.Pool | pg.PoolClient;
@@ -280,6 +281,7 @@ export default class Parcela {
 
     await client.query('COMMIT');
     console.log('[DEBUG] marcarComoPaga - sucesso!');
+    void CaixaPessoal.recalcularESalvarSaldo(id_usuario);
     return true;
   } catch (error) {
     console.error('[DEBUG] marcarComoPaga - erro:', error);
@@ -339,6 +341,7 @@ export default class Parcela {
       }
 
       await client.query('COMMIT');
+      void CaixaPessoal.recalcularESalvarSaldo(id_usuario);
       return true;
     } catch (error) {
       await client.query('ROLLBACK');
@@ -346,6 +349,39 @@ export default class Parcela {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  static async listarParcelasVencendoNoMes(
+    id_usuario: number,
+    mes?: number,
+    ano?: number
+  ): Promise<ParcelaDTO[]> {
+    try {
+      const agora = new Date();
+      const anoRef = ano || agora.getFullYear();
+      const mesRef = mes !== undefined ? mes : agora.getMonth() + 1;
+
+      const dataInicio = `${anoRef}-${String(mesRef).padStart(2, '0')}-01`;
+      const ultimoDia = new Date(anoRef, mesRef, 0).getDate();
+      const dataFim = `${anoRef}-${String(mesRef).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`;
+
+      const query = `
+        SELECT p.*, e.id_usuario
+        FROM Parcela p
+        JOIN Emprestimo e ON p.id_emprestimo = e.id_emprestimo
+        WHERE e.id_usuario = $1
+          AND e.status_emprestimo = TRUE
+          AND (LOWER(p.status_parcela) IN ('pendente', 'atrasada', 'atrasado') OR p.data_pagamento IS NULL)
+          AND p.data_vencimento BETWEEN $2 AND $3
+        ORDER BY p.data_vencimento ASC
+      `;
+
+      const res = await database.query(query, [id_usuario, dataInicio, dataFim]);
+      return res.rows.map((r: any) => Parcela.toDTO(r));
+    } catch (error) {
+      console.error('[ParcelaModel] Erro ao listar parcelas vencendo no mes:', error);
+      throw error;
     }
   }
 

@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { Caixinha } from '../model/Caixinha.js';
+import CaixaPessoal from '../model/CaixaPessoal.js';
 import logger from '../services/Logger.js';
 
 export default class CaixinhaController {
@@ -38,10 +39,30 @@ export default class CaixinhaController {
         return res.status(400).json({ mensagem: 'Valor de depósito deve ser maior que zero.' });
       }
 
-      const atualizada = await Caixinha.depositar(id_caixinha, Number(id), Number(valor));
+      const valorNumerico = Number(valor);
+
+      // Verificar saldo disponível no caixa pessoal
+      const saldoAtual = await CaixaPessoal.obterSaldo(Number(id));
+      if (saldoAtual < valorNumerico) {
+        const saldoFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(saldoAtual);
+        return res.status(400).json({
+          mensagem: `Saldo insuficiente. Seu saldo atual é ${saldoFormatado}.`,
+        });
+      }
+
+      const atualizada = await Caixinha.depositar(id_caixinha, Number(id), valorNumerico);
       if (!atualizada) {
         return res.status(404).json({ mensagem: 'Caixinha não encontrada.' });
       }
+
+      // Registrar movimentação de saída no caixa pessoal
+      await CaixaPessoal.criarMovimentacao(Number(id), {
+        tipo: 'saida',
+        valor: valorNumerico,
+        categoria: 'Caixinha',
+        descricao: `Depósito na caixinha: ${atualizada.nome}`,
+        data: new Date().toISOString().slice(0, 10),
+      });
 
       return res.status(200).json(atualizada);
     } catch (error) {
@@ -60,10 +81,33 @@ export default class CaixinhaController {
         return res.status(400).json({ mensagem: 'Valor de resgate deve ser maior que zero.' });
       }
 
-      const atualizada = await Caixinha.resgatar(id_caixinha, Number(id), Number(valor));
+      const valorNumerico = Number(valor);
+
+      const caixinhaExistente = await Caixinha.obterPorId(id_caixinha, Number(id));
+      if (!caixinhaExistente) {
+        return res.status(404).json({ mensagem: 'Caixinha não encontrada.' });
+      }
+
+      if (caixinhaExistente.saldo < valorNumerico) {
+        const saldoCaixinhaFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(caixinhaExistente.saldo);
+        return res.status(400).json({
+          mensagem: `Saldo insuficiente na caixinha. Disponível: ${saldoCaixinhaFormatado}.`,
+        });
+      }
+
+      const atualizada = await Caixinha.resgatar(id_caixinha, Number(id), valorNumerico);
       if (!atualizada) {
         return res.status(404).json({ mensagem: 'Caixinha não encontrada.' });
       }
+
+      // Registrar movimentação de entrada no caixa pessoal
+      await CaixaPessoal.criarMovimentacao(Number(id), {
+        tipo: 'entrada',
+        valor: valorNumerico,
+        categoria: 'Caixinha',
+        descricao: `Resgate da caixinha: ${atualizada.nome}`,
+        data: new Date().toISOString().slice(0, 10),
+      });
 
       return res.status(200).json(atualizada);
     } catch (error) {

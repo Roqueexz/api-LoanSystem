@@ -33,10 +33,14 @@ const router = Router();
 const authController = new AuthController();
 
 // ============================================
-// ROTA INICIAL & AUTENTICAÇÃO
+// ROTA INICIAL, HEALTH & AUTENTICAÇÃO
 // ============================================
 router.get("/api", (req: Request, res: Response) => {
   res.status(200).json({ mensagem: "Olá, boas-vindas a API do LoanSystem." });
+});
+
+router.get("/api/health", (req: Request, res: Response) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 router.post(

@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS parcela (
     data_vencimento DATE         NOT NULL,
     data_pagamento  DATE,
     status_parcela  VARCHAR(20)  NOT NULL DEFAULT 'pendente'
-                        CHECK (status_parcela IN ('pendente', 'pago')),
+                        CHECK (LOWER(status_parcela) IN ('pendente', 'pago', 'paga', 'atrasada', 'atrasado')),
     -- 'atrasado' NÃO é gravado aqui: é calculado pela aplicação
     -- comparando data_vencimento com a data atual em tempo real.
 

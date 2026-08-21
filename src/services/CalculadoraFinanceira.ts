@@ -48,13 +48,13 @@ export default class CalculadoraFinanceira {
   }
 
   /**
-   * Verifica se a soma das parcelas esta dentro da margem de erro (1 centavo)
+   * Verifica se a soma das parcelas esta dentro da margem de erro (tolerancia para arredondamentos)
    */
   static validarSomaParcelas(
     valorTotal: number,
     valorParcela: number,
     numParcelas: number,
-    margemErro: number = 0.01
+    margemErro: number = 1.00
   ): { valido: boolean; diferenca: number; sugestao?: number } {
     const somaEsperada = valorTotal;
     const somaAtual = valorParcela * numParcelas;

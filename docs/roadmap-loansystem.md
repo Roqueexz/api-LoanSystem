@@ -518,6 +518,20 @@ Implementado:
 
 ---
 
+## Sprint 14 — Correções e Melhorias de UX & Regras Financeiras
+
+**Status:** ✅ Concluída
+
+Implementado:
+
+- **Caixinhas com Dedução e Devolução de Saldo (`CaixinhaController.ts` / `CaixinhasCard.tsx`)**: validação de saldo insuficiente do caixa antes de depositar, criação automática de movimentação de saída (`saida`) ao guardar e movimentação de entrada (`entrada`) ao resgatar, mantendo o saldo consolidado 100% sincronizado. Exibição do saldo disponível no modal de depósito.
+- **Login sem Redirecionamento Indevido (`FormLogin.tsx`)**: limpeza preventiva da sessão (`limparSessao`) e garantia de transição de rota estritamente após a confirmação de autenticação com mensagem de credenciais inválidas.
+- **Empty State Aprimorado na Listagem de Clientes (`ListagemCliente.tsx`)**: destaque visual para primeiro cadastro com botão "Novo Cliente" e diferenciação entre busca sem resultados (com botão "Limpar Filtros") e base vazia.
+- **Destaque do Próximo Recebimento no Calendário (`Calendario.tsx`)**: identificação automática e destaque em verde esmeralda no dia correspondente ao próximo recebimento a vencer na visão mensal e semanal.
+- **Margem de Tolerância em Cálculos de Parcelas (`CalculadoraFinanceira.ts`)**: ampliação da margem de tolerância para R$ 1,00 para absorver acúmulos de arredondamento de centavos.
+
+---
+
 # Backlog Futuro
 
 Após concluir a Sprint 13, iniciar apenas quando o produto estiver estável.

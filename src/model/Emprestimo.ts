@@ -1,11 +1,11 @@
 import type EmprestimoDTO from '../interface/EmprestimoDTO.js';
-import databaseInstance from './DatabaseModel.js';
 import Parcela from './Parcela.js';
 import Juros from '../services/Juros.js';
 import { isDataValida, formatarDataISO } from '../services/Utilitario.js';
 import CaixaPessoal from './CaixaPessoal.js';
+import { DatabaseModel } from "./DatabaseModel.js";
 
-const database = databaseInstance.pool;
+const database = new DatabaseModel().pool;
 
 export default class Emprestimo {
   private id_emprestimo: number = 0;

@@ -6,10 +6,10 @@ import type {
   ContaDTO,
   MetaDTO,
 } from '../interface/CaixaPessoalDTO.js';
-import databaseInstance from './DatabaseModel.js';
 import logger from '../services/Logger.js';
+import { DatabaseModel } from "./DatabaseModel.js";
 
-const database = databaseInstance.pool;
+const database = new DatabaseModel().pool;
 
 // Cédulas válidas — imutável, definido uma vez
 const CEDULAS_VALIDAS = [200, 100, 50, 20, 10, 5, 2];

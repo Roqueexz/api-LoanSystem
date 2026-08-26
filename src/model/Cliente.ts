@@ -1,11 +1,11 @@
 import type ClienteDTO from "../interface/ClienteDTO.js";
 import type ResumoClienteDTO from "../interface/ResumoClienteDTO.js";
-import databaseInstance from "./DatabaseModel.js";
 import Emprestimo from "./Emprestimo.js";
 import Parcela from "./Parcela.js";
 import { capitalizar, formatarTelefone } from '../services/Utilitario.js';
+import { DatabaseModel } from "./DatabaseModel.js";
 
-const database = databaseInstance.pool;
+const database = new DatabaseModel().pool;
 
 export default class Cliente {
   private id_cliente: number = 0;

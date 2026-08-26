@@ -1,4 +1,7 @@
-import databaseInstance from "./DatabaseModel.js";
+import { data } from "react-router-dom";
+import { DatabaseModel } from "./DatabaseModel.js";
+
+const database = new DatabaseModel().pool;
 
 export interface ICaixinha {
   id_caixinha: number;
@@ -19,7 +22,7 @@ export class Caixinha {
       WHERE id_usuario = $1
       ORDER BY id_caixinha ASC;
     `;
-    const res = await databaseInstance.pool.query(query, [id_usuario]);
+    const res = await database.query(query, [id_usuario]);
     return res.rows;
   }
 
@@ -29,7 +32,7 @@ export class Caixinha {
       FROM caixinha_pessoal
       WHERE id_caixinha = $1 AND id_usuario = $2;
     `;
-    const res = await databaseInstance.pool.query(query, [id_caixinha, id_usuario]);
+    const res = await database.query(query, [id_caixinha, id_usuario]);
     return res.rows[0] || null;
   }
 
@@ -47,7 +50,7 @@ export class Caixinha {
       RETURNING id_caixinha, id_usuario, nome, saldo::float, meta::float, emoji, cor, criado_em;
     `;
 
-    const res = await databaseInstance.pool.query(query, [id_usuario, dados.nome, meta, emoji, cor]);
+    const res = await database.query(query, [id_usuario, dados.nome, meta, emoji, cor]);
     return res.rows[0];
   }
 
@@ -63,7 +66,7 @@ export class Caixinha {
       RETURNING id_caixinha, id_usuario, nome, saldo::float, meta::float, emoji, cor, criado_em;
     `;
 
-    const res = await databaseInstance.pool.query(query, [id_caixinha, id_usuario, valor]);
+    const res = await database.query(query, [id_caixinha, id_usuario, valor]);
     return res.rows[0] || null;
   }
 
@@ -79,7 +82,7 @@ export class Caixinha {
       RETURNING id_caixinha, id_usuario, nome, saldo::float, meta::float, emoji, cor, criado_em;
     `;
 
-    const res = await databaseInstance.pool.query(query, [id_caixinha, id_usuario, valor]);
+    const res = await database.query(query, [id_caixinha, id_usuario, valor]);
     return res.rows[0] || null;
   }
 
@@ -89,7 +92,7 @@ export class Caixinha {
       WHERE id_caixinha = $1 AND id_usuario = $2;
     `;
 
-    const res = await databaseInstance.pool.query(query, [id_caixinha, id_usuario]);
+    const res = await database.query(query, [id_caixinha, id_usuario]);
     return (res.rowCount ?? 0) > 0;
   }
 }

@@ -1,8 +1,8 @@
-import databaseInstance from "./DatabaseModel.js";
 import logger from "../services/Logger.js";
 import { formatarDataISO } from '../services/Utilitario.js';
+import { DatabaseModel } from "./DatabaseModel.js";
 
-const database = databaseInstance.pool;
+const database = new DatabaseModel().pool;
 
 export default class Calendario {
 

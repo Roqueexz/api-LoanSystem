@@ -1,6 +1,8 @@
-import databaseInstance from './DatabaseModel.js';
 import bcrypt from 'bcrypt';
 import { capitalizar } from '../services/Utilitario.js';
+import { DatabaseModel } from './DatabaseModel.js';
+
+const database = new DatabaseModel().pool;
 
 export interface ResumoGlobalDTO {
   totalCredores: number;
@@ -25,7 +27,7 @@ export interface CredorDTO {
 
 export class Admin {
   public static async resumoGlobal(): Promise<ResumoGlobalDTO> {
-    const pool = databaseInstance.pool;
+    const pool = database;
 
     const queryCredores = `
       SELECT 
@@ -59,7 +61,7 @@ export class Admin {
   }
 
   public static async listarCredores(): Promise<CredorDTO[]> {
-    const pool = databaseInstance.pool;
+    const pool = database;
 
     const query = `
       SELECT 
@@ -85,7 +87,7 @@ export class Admin {
   }
 
   public static async criarCredor(dados: { nome: string; email: string; senha: string }): Promise<CredorDTO> {
-    const pool = databaseInstance.pool;
+    const pool = database;
     const nome = capitalizar(dados.nome);
     const email = dados.email.toLowerCase().trim();
     const hash = await bcrypt.hash(dados.senha, 10);
@@ -114,21 +116,21 @@ export class Admin {
   }
 
   public static async suspenderCredor(id_usuario: number): Promise<boolean> {
-    const pool = databaseInstance.pool;
+    const pool = database;
     const query = `UPDATE usuario SET ativo = false WHERE id_usuario = $1 AND role != 'admin' RETURNING id_usuario;`;
     const res = await pool.query(query, [id_usuario]);
     return (res.rowCount ?? 0) > 0;
   }
 
   public static async reativarCredor(id_usuario: number): Promise<boolean> {
-    const pool = databaseInstance.pool;
+    const pool = database;
     const query = `UPDATE usuario SET ativo = true WHERE id_usuario = $1 RETURNING id_usuario;`;
     const res = await pool.query(query, [id_usuario]);
     return (res.rowCount ?? 0) > 0;
   }
 
   public static async removerCredor(id_usuario: number): Promise<boolean> {
-    const pool = databaseInstance.pool;
+    const pool = database;
     const query = `DELETE FROM usuario WHERE id_usuario = $1 AND role != 'admin';`;
     const res = await pool.query(query, [id_usuario]);
     return (res.rowCount ?? 0) > 0;

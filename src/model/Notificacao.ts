@@ -1,8 +1,8 @@
-import databaseInstance from './DatabaseModel.js';
 import logger from '../services/Logger.js';
 import type { NotificacaoDTO, PreferenciaNotificacaoDTO } from '../interface/NotificacaoDTO.js';
+import { DatabaseModel } from "./DatabaseModel.js";
 
-const database = databaseInstance.pool;
+const database = new DatabaseModel().pool;
 
 export default class Notificacao {
   static async listar(idUsuario: number): Promise<{ notificacoes: NotificacaoDTO[]; resumo: { total: number; naoLidas: number; criticas: number } }> {

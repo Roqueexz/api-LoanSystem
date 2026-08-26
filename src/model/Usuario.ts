@@ -1,8 +1,8 @@
-import databaseInstance from "./DatabaseModel.js";
 import bcrypt from "bcrypt";
 import { capitalizar, isEmailValido } from '../services/Utilitario.js';
+import { DatabaseModel } from "./DatabaseModel.js";
 
-const database = databaseInstance.pool;
+const database = new DatabaseModel().pool;
 
 export interface UsuarioDTO {
   id_usuario: number;

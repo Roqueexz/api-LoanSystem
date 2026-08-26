@@ -1,13 +1,12 @@
-import databaseInstance from './DatabaseModel.js';
 import type ParcelaDTO from '../interface/ParcelaDTO.js';
 import type EmprestimoDTO from '../interface/EmprestimoDTO.js';
 import type pg from 'pg';
 import CalculadoraFinanceira from '../services/CalculadoraFinanceira.js';
 import { adicionarMeses, isDataValida } from '../services/Utilitario.js';
 import CaixaPessoal from './CaixaPessoal.js';
+import { DatabaseModel } from "./DatabaseModel.js";
 
-const database = databaseInstance.pool;
-type Executor = pg.Pool | pg.PoolClient;
+const database = new DatabaseModel().pool;type Executor = pg.Pool | pg.PoolClient;
 
 export default class Parcela {
   private static toDTO(row: any): ParcelaDTO {

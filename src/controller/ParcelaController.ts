@@ -1,10 +1,10 @@
 import Parcela from "../model/Parcela.js";
-import databaseInstance from "../model/DatabaseModel.js";
 import { type Request, type Response } from "express";
 import logger from "../services/Logger.js";
 import { isNumeroValido } from "../services/Utilitario.js";
+import { DatabaseModel } from "../model/DatabaseModel.js";
 
-const database = databaseInstance.pool;
+const database = new DatabaseModel().pool;
 
 export default class ParcelaController {
   

@@ -11,16 +11,41 @@ dotenv.config();
 const server = express();
 
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-access-token', 'Cache-Control', 'Pragma', 'X-Requested-With', 'Accept', 'Origin'],
-  credentials: true,
+
+    origin:
+        process.env.FRONTEND_URL ||
+        "http://localhost:5173",
+
+    methods: [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "OPTIONS"
+    ],
+
+    allowedHeaders: [
+        "Content-Type",
+        "x-access-token",
+        "Cache-Control",
+        "Pragma",
+        "X-Requested-With",
+        "Accept",
+        "Origin"
+    ],
+
+    credentials: true,
 };
 
 server.use(cors(corsOptions));
+
 server.use(express.json());
-server.use('/api', apiLimiter);
+
+server.use("/api", apiLimiter);
+
 server.use(router);
+
 server.use(errorHandler);
 
 export { server };

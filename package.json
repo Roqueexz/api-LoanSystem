@@ -33,8 +33,11 @@
     "tsx": "^4.23.0",
     "typescript": "^6.0.3"
   },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+"scripts": {
+    "start": "node dist/app.js",
+    "build": "tsc",
+    "dev": "nodemon --watch src --exec ts-node src/app.ts",
+    "test": "echo \"No tests yet\""
   },
   "keywords": [],
   "author": "Pedro Roque",

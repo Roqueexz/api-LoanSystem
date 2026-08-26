@@ -47,7 +47,7 @@ async function iniciarServidor() {
             console.log(
                 `CORS permitido: ${
                     process.env.FRONTEND_URL ||
-                    "http://localhost:5173"
+                    "https://api-loansystem.onrender.com"
                 }`
             );
         });

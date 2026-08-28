@@ -1,11 +1,10 @@
+import "./config/env.js";
 import { server } from "./server.js";
 import { DatabaseModel } from "./model/DatabaseModel.js";
 import logger from "./services/Logger.js";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const port = Number(process.env.PORT) || 3333;
+const NODE_ENV = process.env.NODE_ENV || "development";
 
 async function iniciarServidor() {
 
@@ -31,25 +30,23 @@ async function iniciarServidor() {
             logger.info(
                 {
                     port,
-                    db: process.env.DB_NAME
+                    db: process.env.DB_NAME,
+                    env: NODE_ENV,
+                    frontendUrl: process.env.FRONTEND_URL || "(fallback localhost)"
                 },
                 "Servidor iniciado com sucesso"
             );
 
             console.log(
-                `Servidor rodando na porta ${port}`
+                `Servidor rodando na porta ${port} [${NODE_ENV}]`
             );
 
             console.log(
-                `Banco: ${process.env.DB_NAME}`
+                `Banco: ${process.env.DB_NAME} @ ${process.env.DB_HOST}:${process.env.DB_PORT}`
             );
 
-            console.log(
-                `CORS permitido: ${
-                    process.env.FRONTEND_URL ||
-                    "https://api-loansystem.onrender.com"
-                }`
-            );
+            const corsLog = process.env.FRONTEND_URL || (NODE_ENV === "production" ? "https://interface-loansystem.vercel.app" : "http://localhost:5173 (dev)");
+            console.log(`CORS permitido: ${corsLog}`);
         });
 
     } catch (err) {

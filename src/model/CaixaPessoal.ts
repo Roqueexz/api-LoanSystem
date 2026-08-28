@@ -18,7 +18,23 @@ export default class CaixaPessoal {
 
     // ─── COFRE: OBTER ──────────────────────────────────────────────────
     static async obterCofre(id_usuario: number): Promise<CofreFisicoDTO> {
+        if (!id_usuario || isNaN(Number(id_usuario))) {
+            logger.error({ id_usuario }, '[CaixaPessoal] obterCofre chamado com id_usuario inválido');
+            throw new Error('id_usuario inválido');
+        }
         try {
+            // Auto-migração defensiva: se a tabela ainda não existe no Supabase (init.sql não rodado),
+            // esta query evita o 500 "relation does not exist" que causa o Erro interno ao recuperar o cofre.
+            await database.query(`
+                CREATE TABLE IF NOT EXISTS caixa_pessoal_cofre (
+                    id_cofre      SERIAL PRIMARY KEY,
+                    id_usuario    INT          NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+                    valor_cedula  NUMERIC(6,2) NOT NULL,
+                    quantidade    INT          NOT NULL DEFAULT 0 CHECK (quantidade >= 0),
+                    atualizado_em TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (id_usuario, valor_cedula)
+                )
+            `);
             const query = `
                 SELECT valor_cedula, quantidade
                 FROM caixa_pessoal_cofre

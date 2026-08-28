@@ -12,6 +12,7 @@
 -- DROP TABLES
 -- A ordem importa: tabelas dependentes primeiro.
 -- ============================================
+DROP TABLE IF EXISTS caixa_pessoal_conciliacao CASCADE;
 DROP TABLE IF EXISTS caixinha_pessoal CASCADE;
 DROP TABLE IF EXISTS notificacao CASCADE;
 DROP TABLE IF EXISTS notificacao_preferencia CASCADE;
@@ -349,3 +350,22 @@ CREATE TABLE IF NOT EXISTS notificacao (
 CREATE INDEX IF NOT EXISTS idx_notificacao_usuario    ON notificacao(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_notificacao_prioridade ON notificacao(prioridade);
 CREATE INDEX IF NOT EXISTS idx_notificacao_lida       ON notificacao(id_usuario, lida);
+
+
+-- ============================================
+-- TABELA CAIXA PESSOAL — CONCILIAÇÃO (Sprint 15: OCR vs Manual)
+-- Auditoria de foto + detecção OCR comparada com contagem manual.
+-- ============================================
+CREATE TABLE IF NOT EXISTS caixa_pessoal_conciliacao (
+    id_conciliacao SERIAL PRIMARY KEY,
+    id_usuario     INT          NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+    foto_url       VARCHAR(500),
+    manual_total   NUMERIC(10,2) NOT NULL,
+    ocr_total      NUMERIC(10,2) NOT NULL,
+    divergencia    NUMERIC(10,2) NOT NULL,
+    status         VARCHAR(20)  NOT NULL CHECK (status IN ('conciliado','divergencia','ocr_falhou')),
+    detalhes       JSONB,
+    criado_em      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_conciliacao_usuario ON caixa_pessoal_conciliacao(id_usuario);

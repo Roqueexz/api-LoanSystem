@@ -252,6 +252,17 @@ router.patch(
   Auth.verifyToken,
   CaixaPessoalController.atualizarCedula,
 );
+router.post(
+  "/api/caixa-pessoal/cofre/conciliacao",
+  Auth.verifyToken,
+  upload.single("foto"),
+  CaixaPessoalController.conciliarCofre,
+);
+router.get(
+  "/api/caixa-pessoal/cofre/conciliacoes",
+  Auth.verifyToken,
+  CaixaPessoalController.listarConciliacoes,
+);
 
 // Sprint 3: Movimentações
 router.get(

@@ -60,3 +60,19 @@ export interface MetaDTO {
   percentual?: number | undefined;
   dias_restantes?: number | undefined;
 }
+
+// Sprint 15 — Conciliação Cofre (OCR vs Manual)
+export interface CedulaDetectadaDTO {
+  valor_cedula: number;
+  quantidade: number;
+  confianca: number;
+}
+export interface ConciliacaoDTO {
+  id_conciliacao?: number;
+  manual: { cedulas: CedulaCofreDTO[]; total: number };
+  ocr: { cedulas: CedulaDetectadaDTO[]; total: number; texto_bruto?: string };
+  divergencia: number;
+  status: 'conciliado' | 'divergencia' | 'ocr_falhou';
+  foto_url?: string;
+  criado_em?: string;
+}

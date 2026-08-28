@@ -2,6 +2,9 @@
 import { type Request, type Response } from 'express';
 import CaixaPessoal from '../model/CaixaPessoal.js';
 import logger from '../services/Logger.js';
+import { analisarConciliacao, listarConciliacoes } from '../services/ConciliacaoService.js';
+import fs from 'fs';
+import path from 'path';
 
 const CEDULAS_VALIDAS = [2, 5, 10, 20, 50, 100, 200];
 
@@ -11,12 +14,18 @@ export default class CaixaPessoalController {
     static async obterCofre(req: Request, res: Response): Promise<any> {
         try {
             const { id } = (req as any).usuario;
+            if (!id || isNaN(Number(id))) {
+                logger.warn({ id }, '[CaixaPessoalController] obterCofre sem id válido no token');
+                return res.status(401).json({ mensagem: 'Sessão inválida. Faça login novamente.' });
+            }
             const cofre = await CaixaPessoal.obterCofre(Number(id));
             return res.status(200).json(cofre);
-        } catch (error) {
-            logger.error({ error }, '[CaixaPessoalController] Erro ao obter cofre');
+        } catch (error: any) {
+            logger.error({ error: error?.message || error, stack: error?.stack }, '[CaixaPessoalController] Erro ao obter cofre');
+            // Expõe a mensagem apenas em desenvolvimento para facilitar o debug do Supabase/SSL
+            const detalhe = process.env.NODE_ENV !== 'production' && error?.message ? ` (${error.message})` : '';
             return res.status(500).json({
-                mensagem: 'Erro interno ao recuperar o cofre.'
+                mensagem: 'Erro interno ao recuperar o cofre.' + detalhe
             });
         }
     }
@@ -425,6 +434,67 @@ export default class CaixaPessoalController {
         } catch (error) {
             logger.error({ error }, '[CaixaPessoalController] Erro ao remover meta');
             return res.status(500).json({ mensagem: 'Erro interno ao remover meta.' });
+        }
+    }
+
+    // ─── POST /api/caixa-pessoal/cofre/conciliacao (foto OCR vs manual) ─
+    static async conciliarCofre(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            if (!id || isNaN(Number(id))) return res.status(401).json({ mensagem: 'Sessão inválida.' });
+
+            // Manual vem como JSON string no multipart (campo 'manual')
+            let manualCedulas: { valor_cedula: number; quantidade: number }[] = [];
+            if (req.body.manual) {
+                try { manualCedulas = JSON.parse(req.body.manual); } catch { manualCedulas = []; }
+            }
+            // Fallback: se não enviou manual, usa o cofre atual
+            if (manualCedulas.length === 0) {
+                const cofre = await CaixaPessoal.obterCofre(Number(id));
+                manualCedulas = cofre.cedulas;
+            }
+
+            // OCR do cliente (opcional) — campo 'ocr' como JSON
+            let ocrClient: any = undefined;
+            if (req.body.ocr) {
+                try { ocrClient = JSON.parse(req.body.ocr); } catch { ocrClient = undefined; }
+            }
+
+            const file = (req as any).file as Express.Multer.File | undefined;
+            let fotoUrl: string | null = null;
+            let fotoBuffer: Buffer | null = null;
+
+            if (file) {
+                fotoBuffer = await fs.promises.readFile(file.path);
+                // Processa com sharp para webp (reaproveita helper existente)
+                try {
+                    const sharp = (await import('sharp')).default;
+                    const outPath = file.path.replace(/\.[^.]+$/, '.webp');
+                    await sharp(file.path).rotate().resize({ width: 1280, height: 1280, fit: 'inside' }).toFormat('webp', { quality: 80 }).toFile(outPath);
+                    await fs.promises.unlink(file.path).catch(() => {});
+                    fotoUrl = `/uploads/${path.basename(outPath)}`;
+                } catch {
+                    fotoUrl = `/uploads/${path.basename(file.path)}`;
+                }
+            }
+
+            const resultado = await analisarConciliacao(Number(id), manualCedulas, fotoUrl, fotoBuffer, ocrClient);
+            return res.status(200).json(resultado);
+        } catch (error: any) {
+            logger.error({ error: error?.message || error }, '[CaixaPessoalController] Erro na conciliação OCR');
+            return res.status(500).json({ mensagem: 'Erro interno na conciliação.', detalhe: error?.message });
+        }
+    }
+
+    // ─── GET /api/caixa-pessoal/cofre/conciliacoes ─────────────────────
+    static async listarConciliacoes(req: Request, res: Response): Promise<any> {
+        try {
+            const { id } = (req as any).usuario;
+            const lista = await listarConciliacoes(Number(id), 20);
+            return res.status(200).json(lista);
+        } catch (error) {
+            logger.error({ error }, '[CaixaPessoalController] Erro ao listar conciliações');
+            return res.status(500).json({ mensagem: 'Erro interno ao listar conciliações.' });
         }
     }
 }

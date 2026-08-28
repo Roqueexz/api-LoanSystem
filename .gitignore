@@ -1,8 +1,14 @@
 # Environment variables
+# Ignora arquivos de ambiente com segredos reais
 .env
 .env.local
 .env.production
+.env.*.local
 
-# Node
+# Libera apenas templates e o ambiente de desenvolvimento local
+.env.example
+.env.development
+
+# Node & Build
 node_modules/
 dist/

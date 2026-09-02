@@ -41,28 +41,15 @@ export default class CaixinhaController {
 
       const valorNumerico = Number(valor);
 
-      // Verificar saldo disponível no caixa pessoal
-      const saldoAtual = await CaixaPessoal.obterSaldo(Number(id));
-      if (saldoAtual < valorNumerico) {
-        const saldoFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(saldoAtual);
-        return res.status(400).json({
-          mensagem: `Saldo insuficiente. Seu saldo atual é ${saldoFormatado}.`,
-        });
+      const caixinhaExistente = await Caixinha.obterPorId(id_caixinha, Number(id));
+      if (!caixinhaExistente) {
+        return res.status(404).json({ mensagem: 'Caixinha não encontrada.' });
       }
 
       const atualizada = await Caixinha.depositar(id_caixinha, Number(id), valorNumerico);
       if (!atualizada) {
         return res.status(404).json({ mensagem: 'Caixinha não encontrada.' });
       }
-
-      // Registrar movimentação de saída no caixa pessoal
-      await CaixaPessoal.criarMovimentacao(Number(id), {
-        tipo: 'saida',
-        valor: valorNumerico,
-        categoria: 'Caixinha',
-        descricao: `Depósito na caixinha: ${atualizada.nome}`,
-        data: new Date().toISOString().slice(0, 10),
-      });
 
       return res.status(200).json(atualizada);
     } catch (error) {
@@ -99,15 +86,6 @@ export default class CaixinhaController {
       if (!atualizada) {
         return res.status(404).json({ mensagem: 'Caixinha não encontrada.' });
       }
-
-      // Registrar movimentação de entrada no caixa pessoal
-      await CaixaPessoal.criarMovimentacao(Number(id), {
-        tipo: 'entrada',
-        valor: valorNumerico,
-        categoria: 'Caixinha',
-        descricao: `Resgate da caixinha: ${atualizada.nome}`,
-        data: new Date().toISOString().slice(0, 10),
-      });
 
       return res.status(200).json(atualizada);
     } catch (error) {

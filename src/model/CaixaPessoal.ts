@@ -118,22 +118,31 @@ export default class CaixaPessoal {
         }
     }
 
-    // ─── SALDO CONSOLIDADO: OBTER ──────────────────────────────────────
+    // ─── SALDO CONSOLIDADO: OBTER (CAIXINHAS + CAIXA PESSOAL / COFRE) ──
     static async obterSaldo(id_usuario: number): Promise<number> {
         try {
             await database.query(`
-                CREATE TABLE IF NOT EXISTS caixa_pessoal (
-                    id_usuario INT PRIMARY KEY REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+                CREATE TABLE IF NOT EXISTS caixinha_pessoal (
+                    id_caixinha SERIAL PRIMARY KEY,
+                    id_usuario INT NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+                    nome VARCHAR(100) NOT NULL,
                     saldo NUMERIC(10,2) NOT NULL DEFAULT 0.00,
-                    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    meta NUMERIC(10,2),
+                    emoji VARCHAR(10) DEFAULT '🐷',
+                    cor VARCHAR(20) DEFAULT 'indigo',
+                    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             `);
-            const query = `SELECT saldo FROM caixa_pessoal WHERE id_usuario = $1`;
-            const res = await database.query(query, [id_usuario]);
-            if (res.rows.length > 0) {
-                return Number(res.rows[0].saldo);
-            }
-            return 0;
+            const resCaixinhas = await database.query(
+                `SELECT COALESCE(SUM(saldo), 0) as total FROM caixinha_pessoal WHERE id_usuario = $1`,
+                [id_usuario]
+            );
+            const totalCaixinhas = Number(resCaixinhas.rows[0]?.total || 0);
+
+            const cofre = await CaixaPessoal.obterCofre(id_usuario).catch(() => ({ total: 0, cedulas: [] }));
+            const totalCofre = Number(cofre?.total || 0);
+
+            return totalCaixinhas + totalCofre;
         } catch (error) {
             logger.warn({ error, id_usuario }, '[CaixaPessoal] Aviso ao obter saldo consolidado');
             return 0;
@@ -176,20 +185,8 @@ export default class CaixaPessoal {
     // ─── SALDO CONSOLIDADO: RECALCULAR E SALVAR ────────────────────────
     static async recalcularESalvarSaldo(id_usuario: number): Promise<number> {
         try {
-            const cofre = await CaixaPessoal.obterCofre(id_usuario);
-            const movimentacoes = await CaixaPessoal.listarMovimentacoes(id_usuario);
-
-            const entradas = movimentacoes
-                .filter((m) => m.tipo === 'entrada')
-                .reduce((acc, m) => acc + Number(m.valor || 0), 0);
-
-            const saidas = movimentacoes
-                .filter((m) => m.tipo === 'saida')
-                .reduce((acc, m) => acc + Number(m.valor || 0), 0);
-
-            const novoSaldo = Number(cofre.total || 0) + entradas - saidas;
+            const novoSaldo = await CaixaPessoal.obterSaldo(id_usuario);
             await CaixaPessoal.atualizarSaldo(id_usuario, novoSaldo);
-
             return novoSaldo;
         } catch (error) {
             logger.warn({ error, id_usuario }, '[CaixaPessoal] Erro no recálculo automático de saldo');
